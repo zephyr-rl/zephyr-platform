@@ -13,6 +13,10 @@ What is imported:
   the stock item stays as it is and is listed in the report as an overlap to review.
 - each login of ``restock_upload_ledger`` (accounts uploaded to the Eldorado vault by the old
   restock) → a ``void`` item if it is not known yet; quarantined if it is still in stock.
+
+Before the cut-over (``sync_removed``): accounts imported earlier that are no longer in the old
+stock (sold or removed by the old system during the shadow period) are taken out of sale
+(``extracted``, can be undone), so they can never be sold a second time by the platform.
 """
 
 from __future__ import annotations
@@ -66,6 +70,7 @@ class Report:
     history_items_created: int = 0
     overlaps: Counter[str] = field(default_factory=Counter)
     overlap_item_ids: list[int] = field(default_factory=list)
+    gone_from_old_stock: int = 0
     ledger_logins: int = 0
     ledger_void_created: int = 0
     ledger_quarantined: int = 0
@@ -97,6 +102,7 @@ class Report:
             "history_items_created": self.history_items_created,
             "overlaps_in_stock_and_history": sum(self.overlaps.values()),
             "overlaps_by_pool": dict(self.overlaps),
+            "gone_from_old_stock": self.gone_from_old_stock,
             "ledger_logins": self.ledger_logins,
             "ledger_void_created": self.ledger_void_created,
             "ledger_quarantined": self.ledger_quarantined,
@@ -241,6 +247,7 @@ async def migrate(
     store_id: int,
     dry_run: bool = False,
     quarantine_overlaps: bool = False,
+    sync_removed: bool = False,
 ) -> Report:
     data = read_legacy(db_path)
     report = Report(database=str(db_path), store_id=store_id, dry_run=dry_run)
@@ -480,6 +487,12 @@ async def migrate(
                 reason="In stock and also in the old extraction history: check before selling.",
             )
 
+    # Before the cut-over: accounts imported earlier that left the old stock since then.
+    if sync_removed:
+        report.gone_from_old_stock = await _sync_removed(
+            session, actor, store_id, {r["fingerprint"] for r in rows}
+        )
+
     # 4. Restock upload ledger (accounts already uploaded to the Eldorado vault)
     report.ledger_logins = len(data.ledger)
     void_rows = []
@@ -559,6 +572,48 @@ async def migrate(
     return report
 
 
+async def _sync_removed(
+    session: AsyncSession, actor: audit.Actor, store_id: int, current: set[str]
+) -> int:
+    """Take out of sale the legacy accounts still available here but gone from the old stock.
+    Matched by login fingerprint, so an account moved to another category there is kept."""
+    gone = list(
+        await session.scalars(
+            select(StockItem)
+            .where(
+                StockItem.store_id == store_id,
+                StockItem.legacy_ref.like(f"{store_id}:stock:%"),
+                StockItem.state == ItemState.available,
+                StockItem.fingerprint.not_in(current) if current else StockItem.id.is_not(None),
+            )
+            .with_for_update()
+        )
+    )
+    for item in gone:
+        item.state = ItemState.extracted
+        item.note = (
+            "No longer in the old system's stock before the cut-over (sold or removed there)."
+        )
+    if gone:
+        await _insert_events(
+            session,
+            [
+                {
+                    "item_id": item.id,
+                    "actor_label": actor.label,
+                    "event": "extracted",
+                    "from_state": "available",
+                    "to_state": "extracted",
+                    "batch": "legacy-sync",
+                    "details": {"reason": "gone from the old stock"},
+                    "legacy_key": None,
+                }
+                for item in gone
+            ],
+        )
+    return len(gone)
+
+
 def format_report(report: Report) -> str:
     lines = [
         f"Legacy stock migration {'(DRY RUN, nothing saved)' if report.dry_run else ''}".strip(),
@@ -582,6 +637,7 @@ def format_report(report: Report) -> str:
             if not report.overlaps
             else " — " + ", ".join(f"{k}: {v}" for k, v in report.overlaps.most_common())
         ),
+        f"Gone from the old stock since the first import (taken out of sale): {report.gone_from_old_stock}",
         f"Upload ledger logins: {report.ledger_logins} (void created {report.ledger_void_created}, quarantined {report.ledger_quarantined})",
         f"Unreadable values: {report.unreadable_values}",
         "",

@@ -198,3 +198,39 @@ async def test_two_stores_with_the_same_old_ids_keep_their_own_history(
         sold = await service.find_by_login(session, platform, store_id, "sold1")
         assert sold is not None
         assert len(await service.item_history(session, sold.id)) == 2
+
+
+async def test_sync_before_cut_over_takes_out_what_the_old_system_sold(
+    tmp_path: Path, session: AsyncSession, platform: Platform
+) -> None:
+    db = tmp_path / "accounts.sqlite3"
+    make_legacy_db(db)
+    store_id = (
+        await stores.create_store(session, platform, ACTOR, name="Zephyr", slug="zephyr")
+    ).id
+    await session.commit()
+    await migrate(session, platform, ACTOR, db_path=db, store_id=store_id)
+
+    # During the shadow period the old system sells acc1, and moves "ranked" to category c1.
+    con = sqlite3.connect(db)
+    con.execute("DELETE FROM accounts WHERE value = 'acc1:pw1'")
+    con.execute("UPDATE accounts SET category_id = 'c1', position = 9 WHERE value LIKE 'ranked%'")
+    con.commit()
+    con.close()
+
+    plain = await migrate(session, platform, ACTOR, db_path=db, store_id=store_id, dry_run=True)
+    assert plain.gone_from_old_stock == 0  # only with sync_removed
+
+    report = await migrate(
+        session, platform, ACTOR, db_path=db, store_id=store_id, sync_removed=True
+    )
+    assert report.gone_from_old_stock == 1
+    assert "Gone from the old stock" in format_report(report)
+    acc1 = await service.find_by_login(session, platform, store_id, "acc1")
+    assert acc1 is not None and acc1.state is ItemState.extracted
+    ranked = await service.find_by_login(session, platform, store_id, "ranked@inbox.lv")
+    assert ranked is not None and ranked.state is ItemState.available  # moved, not sold
+    again = await migrate(
+        session, platform, ACTOR, db_path=db, store_id=store_id, sync_removed=True
+    )
+    assert again.gone_from_old_stock == 0

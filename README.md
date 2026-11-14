@@ -97,5 +97,8 @@ docker compose up -d --build
 docker compose run --rm api python -m app.cli create-owner --email you@example.com
 ```
 
+The full plan (install, import, shadow period with the daily comparison, cut-over store by
+store, rollback) is in [docs/DEPLOY.md](docs/DEPLOY.md).
+
 Only Caddy is exposed (ports 80/443). Nightly database dumps go to `./backups` (kept 14 days).
 Keep a copy of `ZP_SECRET_KEYS` outside the server: without it, stored credentials cannot be read.

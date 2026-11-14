@@ -65,3 +65,26 @@ jobs:
         run: |
           cp .env.example .env
           POSTGRES_PASSWORD=ci ZP_SITE_ADDRESS=https://127.0.0.1 docker compose config -q
+      - name: The whole stack starts (as on the VPS) and answers through Caddy
+        run: |
+          key() { python3 -c 'import os,base64;print(base64.urlsafe_b64encode(os.urandom(32)).decode().rstrip("="))'; }
+          cat > .env <<EOF
+          POSTGRES_PASSWORD=ci-$(key)
+          ZP_SECRET_KEYS=$(key)
+          ZP_FINGERPRINT_KEY=$(key)
+          ZP_SITE_ADDRESS=https://127.0.0.1
+          ZP_TLS_MODE=internal
+          EOF
+          mkdir -p backups
+          docker compose up -d --build
+          for i in $(seq 1 60); do
+            if curl -fsk https://127.0.0.1/api/v1/ready; then echo; break; fi
+            sleep 3
+          done
+          curl -fsk https://127.0.0.1/api/v1/ready
+          curl -fsk -o /dev/null -w "panel: %{http_code}\n" https://127.0.0.1/
+          docker compose ps
+          docker compose run --rm api python -m app.cli --help > /dev/null
+      - name: Logs when it failed
+        if: failure()
+        run: docker compose logs --tail=80

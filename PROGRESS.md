@@ -220,6 +220,22 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     sign-in (TOTP).
   - Tests: 272 backend (4 new), 7 frontend; desktop and mobile walkthrough.
 
+- 2026-11-14: **Stage 10 prepared (up to the point that needs the VPS).**
+  - `docs/DEPLOY.md`: install on the VPS, import, shadow period with the daily comparison and
+    its exit criterion, cut-over store by store, rollback.
+  - `compare-shadow`: compares the old system's logs (deliveries with their number of accounts,
+    top-up instructions, vault uploads per offer) with the platform's simulated deliveries and
+    shadow decisions for the same period; never reads the delivered messages (they hold
+    credentials); says when the old logs (about 200 entries) do not cover the period; exits
+    with an error when there are differences (for cron).
+  - `migrate-legacy --sync-removed`: before the cut-over, takes out of sale every account
+    imported earlier that is no longer in the old stock (sold or removed by the old system
+    during the shadow period), matched by login so an account moved to another category there
+    is kept. Without it, those accounts would be on sale twice.
+  - CI starts the whole production stack (`docker compose up`) and checks the API answers
+    through Caddy.
+  - Tests: 275 backend (3 new).
+
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off
   (with a confirmation dialog).

@@ -45,7 +45,13 @@ async def create_owner(email: str, name: str, password: str) -> None:
 
 
 async def migrate_legacy(
-    slug: str, db: Path, *, dry_run: bool, quarantine_overlaps: bool, json_out: Path | None
+    slug: str,
+    db: Path,
+    *,
+    dry_run: bool,
+    quarantine_overlaps: bool,
+    json_out: Path | None,
+    sync_removed: bool = False,
 ) -> bool:
     from app.legacy.migrate import format_report, migrate
     from app.stores.models import Store
@@ -64,6 +70,7 @@ async def migrate_legacy(
                 store_id=store_id,
                 dry_run=dry_run,
                 quarantine_overlaps=quarantine_overlaps,
+                sync_removed=sync_removed,
             )
     finally:
         await platform.db.dispose()
@@ -98,6 +105,27 @@ async def migrate_legacy_settings(slug: str, folder: Path, *, dry_run: bool) -> 
     print(format_settings_report(report))
 
 
+async def compare_shadow(slug: str, folder: Path, hours: int) -> int:
+    from datetime import timedelta
+
+    from app.core.db import utcnow
+    from app.legacy.compare import compare, format_comparison
+    from app.stores.models import Store
+
+    platform = build_platform(get_settings())
+    try:
+        async with platform.db.sessionmaker() as session:
+            store = await session.scalar(select(Store).where(Store.slug == slug))
+            if store is None:
+                sys.exit(f"No store with slug {slug!r}.")
+            until = utcnow()
+            result = await compare(session, store.id, folder, until - timedelta(hours=hours), until)
+            print(format_comparison(result, store.name))
+    finally:
+        await platform.db.dispose()
+    return 0 if result.ok else 1
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -116,6 +144,12 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Quarantine accounts that are in stock but also in the old extraction history",
     )
+    legacy.add_argument(
+        "--sync-removed",
+        action="store_true",
+        help="Before the cut-over: take out of sale the accounts imported earlier that are no "
+        "longer in the old stock (sold or removed by the old system meanwhile)",
+    )
     legacy.add_argument("--json", type=Path, help="Also write the report as JSON")
     legacy_settings = sub.add_parser(
         "migrate-legacy-settings",
@@ -126,6 +160,13 @@ def main(argv: list[str] | None = None) -> None:
         "--folder", required=True, type=Path, help="The old store folder (with config.json)"
     )
     legacy_settings.add_argument("--dry-run", action="store_true", help="Report only, save nothing")
+    shadow_cmp = sub.add_parser(
+        "compare-shadow",
+        help="Compare the old system's logs with what the platform would have done (read-only)",
+    )
+    shadow_cmp.add_argument("--store", required=True, help="Slug of the store")
+    shadow_cmp.add_argument("--folder", required=True, type=Path, help="The old store folder")
+    shadow_cmp.add_argument("--hours", type=int, default=24, help="Period to compare (default 24)")
     rec = sub.add_parser(
         "eldorado-record", help="Save redacted Eldorado responses (GET only) as test fixtures"
     )
@@ -141,6 +182,9 @@ def main(argv: list[str] | None = None) -> None:
             print(f"wrote {path}")
         return
 
+    if args.command == "compare-shadow":
+        sys.exit(asyncio.run(compare_shadow(args.store, args.folder, args.hours)))
+
     if args.command == "migrate-legacy-settings":
         asyncio.run(migrate_legacy_settings(args.store, args.folder, dry_run=args.dry_run))
         return
@@ -153,6 +197,7 @@ def main(argv: list[str] | None = None) -> None:
                 dry_run=args.dry_run,
                 quarantine_overlaps=args.quarantine_overlaps,
                 json_out=args.json,
+                sync_removed=args.sync_removed,
             )
         )
         sys.exit(0 if ok else 1)
