@@ -609,3 +609,30 @@ async def test_store_and_connection_fixture_sanity(session: AsyncSession, shop: 
     assert await session.get(MarketplaceConnection, shop.connection_id) is not None
     item = await session.scalar(select(StockItem).where(StockItem.state == ItemState.available))
     assert item is not None
+
+
+async def test_orders_api(auth_client, session: AsyncSession, shop: Shop) -> None:
+    await shop.setup(session, mode=DeliveryMode.assisted)
+    shop.sell("A1")
+    await shop.poll()
+    await shop.run_jobs()
+    base = f"/api/v1/stores/{shop.store_id}/orders"
+
+    attention = (await auth_client.get(base, params={"show": "attention"})).json()
+    assert [o["remote_id"] for o in attention] == ["A1"]
+    assert attention[0]["fulfilment_state"] == "awaiting_approval"
+    assert (await auth_client.get(f"{base}/summary")).json() == {"attention": 1, "waiting": 0}
+
+    detail = (await auth_client.get(f"{base}/{attention[0]['id']}")).json()
+    assert [e["event"] for e in detail["events"]] == ["created", "reserved", "awaiting_approval"]
+    assert detail["reserved"][0]["state"] == "reserved" and "pass" not in str(detail)
+    assert detail["pool_name"] == "Twitch drops"
+
+    approved = await auth_client.post(f"{base}/{attention[0]['id']}/approve")
+    assert approved.status_code == 200
+    again = await auth_client.post(f"{base}/{attention[0]['id']}/approve")
+    assert again.status_code == 409
+    await shop.run_jobs()
+    detail = (await auth_client.get(f"{base}/{attention[0]['id']}")).json()
+    assert detail["fulfilment_state"] == "done"
+    assert (await auth_client.post(f"{base}/poll")).status_code == 202

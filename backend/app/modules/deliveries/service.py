@@ -780,6 +780,8 @@ class ActionError(Exception):
 async def approve(session: AsyncSession, actor: audit.Actor, fulfilment: Fulfilment) -> None:
     if fulfilment.state is not FulfilmentState.awaiting_approval:
         raise ActionError("Only orders waiting for approval can be approved.")
+    if fulfilment.approved_by is not None:
+        raise ActionError("This delivery is already approved and on its way.")
     fulfilment.approved_by = actor.label
     note(session, fulfilment, "approved", "Delivery approved.", actor=actor)
     audit.record(
