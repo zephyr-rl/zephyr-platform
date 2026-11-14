@@ -11,6 +11,8 @@ backend/    FastAPI API, worker, scheduler (Python 3.12, PostgreSQL 16)
   app/core/        config, database, crypto, audit log, events (outbox), jobs, module registry
   app/identity/    owner login, sessions, rate limit
   app/stores/      stores, marketplace connections, per-store module switches
+  app/stock/       stock pools and items, multi-format importer, extraction, moves
+  app/legacy/      read-only importer for the old stores' databases
   app/connectors/  connector protocol, fake marketplace, shadow (dry-run) wrapper
   app/modules/     feature modules (declared; behaviour arrives stage by stage)
   app/workers/     worker and scheduler processes
@@ -44,6 +46,20 @@ cd ../frontend
 npm install
 npm run dev                                  # http://localhost:5173 (proxies /api to :8000)
 ```
+
+## Import the stock of the old stores
+
+Reads an old `account_manager/accounts.sqlite3` read-only (work on a copy) and prints a
+reconciliation per pool. Safe to run again: it only adds what is missing.
+
+```bash
+uv run python -m app.cli migrate-legacy --store zephyrstore \
+    --db "path/to/Eldorado API - ZephyrStore/account_manager/accounts.sqlite3" --dry-run
+```
+
+Add `--quarantine-overlaps` to hold back accounts that are in stock but also appear in the old
+extraction history. Requires `ZP_FINGERPRINT_KEY` (generate it once with `generate-key` and
+never change it: duplicates are detected with it).
 
 ## Tests and checks
 

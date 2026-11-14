@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Badge, Card, EmptyState, StatusDot } from "@/components/ui";
-import { api, type Connection, type JobsSummary, type StoreModule } from "@/lib/api";
+import { api, type Connection, type JobsSummary, type StockPool, type StoreModule } from "@/lib/api";
 import { useStores } from "@/lib/session";
 
 function Figure({ label, value, tone }: { label: string; value: string | number; tone?: "warning" }) {
@@ -28,6 +28,11 @@ export function OverviewPage() {
     queryFn: () => api<StoreModule[]>(`/stores/${storeId}/modules`),
     enabled: storeId !== undefined,
   });
+  const pools = useQuery({
+    queryKey: ["stock", storeId, "pools"],
+    queryFn: () => api<StockPool[]>(`/stores/${storeId}/stock/pools`),
+    enabled: storeId !== undefined,
+  });
   const jobs = useQuery({
     queryKey: ["jobs", "summary"],
     queryFn: () => api<JobsSummary>("/jobs/summary"),
@@ -44,7 +49,9 @@ export function OverviewPage() {
     );
   }
 
-  const enabled = modules.data?.filter((m) => m.enabled) ?? [];
+  const activePools = pools.data?.filter((p) => !p.archived) ?? [];
+  const inStock = activePools.reduce((sum, p) => sum + p.counts.available, 0);
+  const lowPools = activePools.filter((p) => p.low);
   const connection = connections.data?.[0];
   const counts = jobs.data?.counts;
 
@@ -66,9 +73,9 @@ export function OverviewPage() {
       )}
 
       <section aria-label="Key figures" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Figure label="Active modules" value={modules.data ? enabled.length : "—"} />
+        <Figure label="Accounts in stock" value={pools.data ? inStock.toLocaleString() : "—"} />
+        <Figure label="Pools low on stock" value={pools.data ? lowPools.length : "—"} tone={lowPools.length ? "warning" : undefined} />
         <Figure label="Jobs queued" value={counts?.queued ?? "—"} />
-        <Figure label="Jobs running" value={counts?.running ?? "—"} />
         <Figure label="Failed jobs" value={counts?.dead ?? "—"} tone={counts?.dead ? "warning" : undefined} />
       </section>
 
@@ -101,6 +108,22 @@ export function OverviewPage() {
           </ul>
         </Card>
       </div>
+
+      {lowPools.length > 0 && (
+        <Card title="Low on stock" actions={<Link to="/stock" className="text-[13px] hover:underline">Open stock</Link>}>
+          <ul className="divide-y divide-line">
+            {lowPools.map((p) => (
+              <li key={p.id} className="flex items-center gap-3 px-4 py-2.5 text-[13px]">
+                <Link to="/stock/$poolId" params={{ poolId: String(p.id) }} className="font-medium hover:underline">
+                  {p.name}
+                </Link>
+                <span className="tabular ml-auto text-warning">{p.counts.available} left</span>
+                <span className="text-muted">alert at {p.low_stock_threshold}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {jobs.data && jobs.data.dead.length > 0 && (
         <Card title="Failed jobs">

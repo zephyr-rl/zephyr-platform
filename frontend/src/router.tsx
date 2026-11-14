@@ -14,6 +14,8 @@ import { AutomationPage } from "@/pages/Automation";
 import { LoginPage } from "@/pages/Login";
 import { OverviewPage } from "@/pages/Overview";
 import { SettingsPage } from "@/pages/Settings";
+import { StockPage } from "@/pages/Stock";
+import { StockPoolPage } from "@/pages/StockPool";
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -79,7 +81,8 @@ const routeTree = rootRoute.addChildren([
     createRoute({ getParentRoute: () => appRoute, path: "/automation", component: AutomationPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/settings", component: SettingsPage }),
     comingSoon("/orders", "Orders", "Stage 5"),
-    comingSoon("/stock", "Stock", "Stage 3"),
+    createRoute({ getParentRoute: () => appRoute, path: "/stock", component: StockPage }),
+    createRoute({ getParentRoute: () => appRoute, path: "/stock/$poolId", component: StockPoolPage }),
     comingSoon("/listings", "Listings", "Stage 4"),
     comingSoon("/messages", "Messages", "Stage 7"),
     comingSoon("/reports", "Reports", "Stage 7"),

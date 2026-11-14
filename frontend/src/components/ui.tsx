@@ -169,8 +169,9 @@ export function TextAreaField({
   hint,
   error,
   className,
+  mono = false,
   ...rest
-}: FieldProps & TextareaHTMLAttributes<HTMLTextAreaElement>) {
+}: FieldProps & TextareaHTMLAttributes<HTMLTextAreaElement> & { mono?: boolean }) {
   const id = useId();
   return (
     <div className={cx("flex flex-col gap-1.5", className)}>
@@ -181,7 +182,12 @@ export function TextAreaField({
         id={id}
         aria-invalid={error ? true : undefined}
         aria-describedby={error || hint ? `${id}-msg` : undefined}
-        className={cx(inputCls, "min-h-24 resize-y leading-relaxed", error ? "border-danger" : "border-line-strong")}
+        className={cx(
+          inputCls,
+          "min-h-24 resize-y leading-relaxed",
+          mono && "font-mono text-[13px]",
+          error ? "border-danger" : "border-line-strong",
+        )}
         {...rest}
       />
       {(error || hint) && (
@@ -275,6 +281,46 @@ export function ConfirmDialog({
               {confirmLabel}
             </Button>
           </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
+}
+
+// ---- Modal -------------------------------------------------------------------------------
+
+export function Modal({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+  wide = false,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description?: ReactNode;
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/60" />
+        <DialogPrimitive.Content
+          className={cx(
+            "fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100vh-32px)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-lg border border-line-strong bg-raised p-6 shadow-raised",
+            wide ? "w-[min(760px,calc(100vw-32px))]" : "w-[min(480px,calc(100vw-32px))]",
+          )}
+        >
+          <DialogPrimitive.Title className="text-base font-semibold">{title}</DialogPrimitive.Title>
+          {description ? (
+            <DialogPrimitive.Description className="text-fg/80">{description}</DialogPrimitive.Description>
+          ) : (
+            <DialogPrimitive.Description className="sr-only">{title}</DialogPrimitive.Description>
+          )}
+          {children}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

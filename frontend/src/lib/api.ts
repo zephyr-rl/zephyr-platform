@@ -154,3 +154,78 @@ export interface JobsSummary {
   counts: Record<string, number>;
   dead: { id: number; type: string; store_id: number | null; error: string | null }[];
 }
+
+// ---- stock -------------------------------------------------------------------------------
+
+export type ItemState = "available" | "reserved" | "delivered" | "extracted" | "quarantined" | "void";
+
+export interface StockPool {
+  id: number;
+  name: string;
+  game: string;
+  item_type: string;
+  low_stock_threshold: number;
+  archived: boolean;
+  counts: Record<ItemState, number>;
+  low: boolean;
+}
+
+export interface StockItem {
+  id: number;
+  pool_id: number;
+  login_hint: string;
+  state: ItemState;
+  position: number;
+  has_token: boolean;
+  note: string | null;
+  created_at: string;
+  state_changed_at: string;
+}
+
+export interface ItemsPage {
+  items: StockItem[];
+  total: number;
+  next_after: number | null;
+}
+
+export interface ImportPreview {
+  text_sha256: string;
+  detected_format: string;
+  counts: Record<string, number>;
+  lines: {
+    line: number;
+    login_hint: string;
+    status: "new" | "in_pool" | "in_other_pool" | "previously_removed" | "repeated";
+    format: string;
+    has_token: boolean;
+    token_will_attach: boolean;
+  }[];
+  invalid_lines: number[];
+  ignored_lines: number[];
+}
+
+export interface Extraction {
+  id: number;
+  pool_id: number;
+  pool_name: string;
+  actor: string;
+  created_at: string;
+  count: number;
+  reason: string | null;
+  undone_at: string | null;
+}
+
+export interface ExtractionDetail extends Extraction {
+  items: { id: number; login: string; password: string; token: string | null; extra: Record<string, string> }[];
+  text: string;
+  tokens_text: string;
+}
+
+export interface ItemEvent {
+  at: string;
+  actor: string;
+  event: string;
+  from_state: string | null;
+  to_state: string | null;
+  details: Record<string, unknown> | null;
+}

@@ -3,13 +3,17 @@
 Read `SPEC.md` first. This file says where we are and what comes next.
 
 ## Current stage
-**Stage 3 — Stock + importer + legacy migration** (next).
+**Stage 4 — Eldorado connector** (next).
 
 ## Next
-1. Stage 3: stock pools and items (encrypted, never hard-deleted, unique fingerprints),
-   multi-format importer with preview → confirm, `tools/migrate_legacy` (read-only) with
-   reconciliation against the old databases (5,707 / 6,513 / 186).
-2. Stage 4: Eldorado connector with recorded fixtures.
+1. Stage 4: Eldorado connector with recorded fixtures (orders, offers, vault, chat, reviews),
+   read-only live check, listings mapped to stock pools.
+2. Stage 5: deliveries module (auto, assisted, text) with the I1/I2/I4 concurrency tests.
+
+## Open decisions
+- **Accounts in stock that also appear in the old extraction history** (ZephyrStore 157,
+  Kawai 5, Jewelry 0): kept *available* by default (that is how the old system sells them
+  today) and listed in the migration report. `--quarantine-overlaps` holds them back instead.
 
 ## Done
 - 2026-11-14: `SPEC.md` approved (v1.0).
@@ -33,6 +37,22 @@ Read `SPEC.md` first. This file says where we are and what comes next.
     workers never run a job twice), 6 frontend tests, ruff + mypy strict, browser walkthrough.
   - Delivery: Dockerfile, `docker-compose.yml` (postgres, migrate, api, worker, scheduler,
     nightly backup, Caddy), GitHub Actions CI.
+
+- 2026-11-14: **Stage 3 — Stock.**
+  - Pools and items: payload AES-GCM encrypted, login fingerprint (HMAC) unique per store in any
+    state, so an account sold or removed can never be imported and sold again. Twitch tokens as
+    encrypted secrets. Append-only item history. Database triggers: items are never deleted,
+    `delivered` and `void` are final.
+  - Importer for every supplier format (colon/pipe/slash/spaces, tokens, e-mail credentials,
+    numbered and glued lists, Russian labels, name/password blocks, supplier headers) with
+    preview → confirm (guarded by the text hash).
+  - FIFO extraction with copy/download and undo, quarantine/release/void, moves within and across
+    stores, low-stock and depleted events, search by exact login.
+  - `migrate-legacy`: verified on copies of the three stores — 5,707 / 6,513 / 186 accounts and
+    1,391 / 1,391 Twitch tokens reconcile; history imported as 1,762 / 2,564 / 3 "extracted"
+    items; a second run creates nothing. (Run again on fresh copies at cut-over.)
+  - Panel: Stock (pools, search, recent extractions), pool page (filters, import preview,
+    extract, bulk actions, item history), Overview shows stock and low pools.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off
