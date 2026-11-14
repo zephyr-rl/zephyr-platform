@@ -72,6 +72,7 @@ async def app_platform(settings: Settings) -> AsyncIterator[tuple[object, Platfo
         tables = ", ".join(
             f'"{t}"'
             for t in (
+                "listings",
                 "stock_item_events",
                 "stock_item_secrets",
                 "stock_items",

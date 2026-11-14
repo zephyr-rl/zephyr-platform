@@ -188,6 +188,10 @@ class ConnectorRegistry:
             raise ValueError(f"Connector {info.key!r} already registered")
         self._entries[info.key] = (info, factory)
 
+    def override(self, key: str, factory: ConnectorFactory) -> None:
+        """Swap the factory of a registered connector (tests, local tools)."""
+        self._entries[key] = (self.info(key), factory)
+
     def info(self, key: str) -> ConnectorInfo:
         try:
             return self._entries[key][0]
