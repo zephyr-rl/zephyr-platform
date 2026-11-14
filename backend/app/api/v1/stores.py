@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
-from zoneinfo import available_timezones
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
@@ -15,6 +15,15 @@ from app.stores.models import MarketplaceConnection, Store
 router = APIRouter(prefix="/stores", tags=["stores"])
 
 
+def _valid_timezone(value: str) -> str:
+    # Accepts canonical names and their aliases (browsers report e.g. America/Buenos_Aires).
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ValueError("Unknown time zone") from None
+    return value
+
+
 class StoreIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     slug: str = Field(min_length=1, max_length=60, pattern=r"^[a-z0-9][a-z0-9-]*$")
@@ -24,9 +33,7 @@ class StoreIn(BaseModel):
     @field_validator("timezone")
     @classmethod
     def _tz(cls, value: str) -> str:
-        if value not in available_timezones():
-            raise ValueError("Unknown time zone")
-        return value
+        return _valid_timezone(value)
 
 
 class StorePatch(BaseModel):
@@ -39,9 +46,7 @@ class StorePatch(BaseModel):
     @field_validator("timezone")
     @classmethod
     def _tz(cls, value: str | None) -> str | None:
-        if value is not None and value not in available_timezones():
-            raise ValueError("Unknown time zone")
-        return value
+        return None if value is None else _valid_timezone(value)
 
 
 class StoreOut(BaseModel):

@@ -1,0 +1,22 @@
+# ZP_SITE_ADDRESS: your domain (zephyrstore.site) or https://<server-ip>
+# ZP_TLS_MODE: "auto" (public certificate for a domain) or "internal" (self-signed, for an IP)
+
+(tls_auto) {
+}
+
+(tls_internal) {
+	tls internal
+}
+
+{$ZP_SITE_ADDRESS} {
+	import tls_{$ZP_TLS_MODE}
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+		-Server
+	}
+	reverse_proxy api:8000
+}

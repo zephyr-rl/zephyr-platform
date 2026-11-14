@@ -48,6 +48,11 @@ async def test_duplicate_slug_is_rejected(auth_client) -> None:
     assert response.status_code == 409
 
 
+async def test_timezone_aliases_reported_by_browsers_are_accepted(auth_client) -> None:
+    store = await _store(auth_client, slug="ba", timezone="America/Buenos_Aires")
+    assert store["timezone"] == "America/Buenos_Aires"
+
+
 async def test_invalid_timezone_is_rejected(auth_client) -> None:
     response = await auth_client.post("/api/v1/stores", json={**STORE, "timezone": "Mars/Base"})
     assert response.status_code == 422

@@ -1,0 +1,92 @@
+# Production stack for the Linux VPS:  docker compose up -d --build
+# Only Caddy publishes ports. Postgres and the app containers live on the private network.
+
+x-app: &app
+  build: .
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    ZP_ENV: production
+    ZP_DATABASE_URL: postgresql+asyncpg://zephyr:${POSTGRES_PASSWORD}@postgres:5432/zephyr
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: zephyr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: zephyr
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zephyr"]
+      interval: 5s
+      retries: 20
+
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    # Not published: Caddy is the only way in. Forwarded headers are trusted only because of that.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000",
+              "--proxy-headers", "--forwarded-allow-ips=*"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/ready')"]
+      interval: 15s
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "app.workers.worker"]
+
+  scheduler:
+    <<: *app
+    command: ["python", "-m", "app.workers.scheduler"]
+
+  # Invariant I10: nightly dump, 14 days kept in ./backups (copy them off the server too).
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          sleep $$(( (86400 + 3*3600 - $$(date +%s) % 86400) % 86400 + 1 ))
+          f=/backups/zephyr-$$(date +%Y%m%d-%H%M).dump
+          pg_dump -h postgres -U zephyr -Fc zephyr > "$$f.tmp" && mv "$$f.tmp" "$$f"
+          find /backups -name 'zephyr-*.dump' -mtime +14 -delete
+        done
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      ZP_SITE_ADDRESS: ${ZP_SITE_ADDRESS:?set ZP_SITE_ADDRESS in .env}
+      ZP_TLS_MODE: ${ZP_TLS_MODE:-auto}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
