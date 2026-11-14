@@ -32,3 +32,6 @@ def configure_logging(level: str = "INFO") -> None:
     handler.setFormatter(JsonFormatter())
     root.handlers[:] = [handler]
     root.setLevel(level)
+    # HTTP client request lines contain full URLs, and a Discord webhook URL is a secret.
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)

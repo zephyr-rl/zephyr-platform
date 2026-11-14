@@ -100,10 +100,43 @@ class ReviewRemindersSettings(_Settings):
 
 
 class ChatMonitorSettings(_Settings):
+    conversations: int = Field(
+        30,
+        ge=5,
+        le=100,
+        description="How many of the most recent open orders have their chat read.",
+    )
+    max_age_minutes: int = Field(
+        5, ge=1, le=120, description="Messages older than this never raise an alert."
+    )
+    cooldown_minutes: int = Field(
+        20, ge=1, le=1440, description="At most one alert per conversation within this time."
+    )
+    seller_active_minutes: int = Field(
+        3, ge=0, le=60, description="No alert while you wrote in that chat within this time."
+    )
     alert_keywords: list[str] = Field(
-        default_factory=lambda: ["not working", "wrong password", "refund", "banned"],
+        default_factory=lambda: ["not working", "wrong password", "refund", "banned", "scam"],
         max_length=200,
-        description="Buyer messages containing any of these words raise an alert.",
+        description="Messages with any of these words are marked urgent.",
+    )
+    courtesy_replies: list[str] = Field(
+        default_factory=lambda: [
+            "thanks",
+            "thank you",
+            "ty",
+            "thx",
+            "ok",
+            "okay",
+            "received",
+            "done",
+            "perfect",
+            "gracias",
+            "listo",
+            "perfecto",
+        ],
+        max_length=200,
+        description="Short replies like these on delivered orders are not alerted.",
     )
 
 
@@ -160,6 +193,31 @@ class RestockModule(DeclaredModule):
         )
 
 
+class ChatMonitorModule(DeclaredModule):
+    def register(self, ctx: ModuleContext) -> None:
+        from app.modules.chat_monitor import jobs as chat_jobs
+
+        chat_jobs.register(ctx)
+        ctx.periodic.append(
+            PeriodicTask(
+                "chat-monitor", "chat_monitor.scan", timedelta(seconds=30), module_key=self.key
+            )
+        )
+
+
+class ReportsModule(DeclaredModule):
+    def register(self, ctx: ModuleContext) -> None:
+        from app.modules.reports import jobs as report_jobs
+
+        report_jobs.register(ctx)
+        # Checks every minute whether the store's report time has come; sends each day once.
+        ctx.periodic.append(
+            PeriodicTask(
+                "daily-report", "reports.daily", timedelta(seconds=60), module_key=self.key
+            )
+        )
+
+
 V1_MODULES: tuple[DeclaredModule, ...] = (
     DeliveriesModule(
         "deliveries",
@@ -190,17 +248,19 @@ V1_MODULES: tuple[DeclaredModule, ...] = (
         ReviewRemindersSettings,
         frozenset({Capability.ORDERS, Capability.CHAT}),
     ),
-    DeclaredModule(
+    ChatMonitorModule(
         "chat_monitor",
         "Chat monitor",
-        "Flags buyer messages that need attention.",
+        "Alerts you when a buyer writes in an order chat and nobody has answered. "
+        "Reads the orders the Deliveries module records.",
         ChatMonitorSettings,
         frozenset({Capability.CHAT}),
+        default_enabled=True,
     ),
-    DeclaredModule(
+    ReportsModule(
         "reports",
         "Reports",
-        "Daily sales report and statistics.",
+        "Daily sales report at the store's report time, and the numbers in Reports.",
         ReportsSettings,
         frozenset({Capability.ORDERS}),
         default_enabled=True,

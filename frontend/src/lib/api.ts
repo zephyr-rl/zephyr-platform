@@ -341,3 +341,147 @@ export interface OrderDetail extends OrderRow {
   reserved: { login: string; state: string }[];
   pool_name: string | null;
 }
+
+// ---- reports -----------------------------------------------------------------------------
+
+export interface ReportSummary {
+  start: string;
+  end: string;
+  timezone: string;
+  currency: string;
+  revenue: string;
+  orders: number;
+  accounts: number;
+  cancelled_orders: number;
+  cancelled_amount: string;
+  series: { day: string; revenue: string; orders: number; accounts: number }[];
+  by_type: {
+    type: string;
+    label: string;
+    orders: number;
+    units: number;
+    revenue: string;
+  }[];
+  by_listing: {
+    listing_id: number | null;
+    title: string;
+    type: string;
+    orders: number;
+    units: number;
+    revenue: string;
+  }[];
+  stock: { pool_id: number; pool: string; available: number }[];
+  today: string;
+}
+
+export interface DailyReportRow {
+  id: number;
+  day: string;
+  created_at: string;
+  revenue: string;
+  orders: number;
+  accounts: number;
+}
+
+// ---- messages ----------------------------------------------------------------------------
+
+export interface ChatThread {
+  id: number;
+  order_id: number | null;
+  order_remote_id: string | null;
+  order_url: string | null;
+  order_state: string | null;
+  buyer_name: string | null;
+  offer_title: string | null;
+  last_buyer_at: string | null;
+  last_buyer_text: string | null;
+  last_seller_at: string | null;
+  last_alert_at: string | null;
+  urgent: boolean;
+  needs_reply: boolean;
+  handled_at: string | null;
+  handled_by: string | null;
+}
+
+// ---- notifications -----------------------------------------------------------------------
+
+export interface TemplateField {
+  name: string;
+  value: string;
+  inline: boolean;
+}
+
+export interface NotificationTemplate {
+  title: string;
+  description: string;
+  color: string;
+  footer: string;
+  fields: TemplateField[];
+}
+
+export interface EventInfo {
+  type: string;
+  label: string;
+  description: string;
+  group: string;
+  variables: { name: string; description: string; sample: string }[];
+}
+
+export interface NotificationCatalog {
+  events: EventInfo[];
+  presets: {
+    key: string;
+    name: string;
+    event_type: string;
+    template: NotificationTemplate;
+  }[];
+}
+
+export interface NotificationChannel {
+  id: number;
+  name: string;
+  kind: string;
+  target: string;
+  sender_name: string | null;
+  avatar_url: string | null;
+  enabled: boolean;
+  include_shadow: boolean;
+  last_sent_at: string | null;
+  last_error: string | null;
+  rules: number;
+}
+
+export interface NotificationRule {
+  id: number;
+  name: string;
+  event_type: string;
+  channel_id: number;
+  store_id: number | null;
+  enabled: boolean;
+  template: NotificationTemplate;
+  filters: { listing_ids?: number[]; exclude_offer_ids?: string[] };
+  updated_at: string;
+}
+
+export interface DiscordEmbed {
+  title?: string;
+  description?: string;
+  color?: number;
+  fields?: { name: string; value: string; inline: boolean }[];
+  footer?: { text: string };
+}
+
+export interface NotificationDeliveryRow {
+  id: number;
+  created_at: string;
+  sent_at: string | null;
+  event_type: string;
+  rule_id: number | null;
+  channel_id: number;
+  channel: string;
+  store_id: number | null;
+  state: "pending" | "sent" | "failed" | "skipped";
+  summary: string;
+  attempts: number;
+  last_error: string | null;
+}

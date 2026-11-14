@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, literal_column, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -181,31 +181,45 @@ async def _record_order(
         "listing_id": listing.id if listing else None,
         "updated_at": utcnow(),
     }
-    order_id = await session.scalar(
-        insert(Order)
-        .values(
-            store_id=store.id,
-            connection_id=connection.id,
-            remote_id=remote.remote_id,
-            remote_offer_id=remote.offer_id,
-            quantity=remote.quantity,
-            total_amount=remote.total.amount,
-            currency=remote.total.currency[:3],
-            buyer_name=remote.buyer_name,
-            conversation_id=remote.conversation_id,
-            offer_title=remote.offer_title,
-            category=remote.category,
-            remote_created_at=remote.created_at,
-            **values,
+    row: Any = (
+        await session.execute(
+            insert(Order)
+            .values(
+                store_id=store.id,
+                connection_id=connection.id,
+                remote_id=remote.remote_id,
+                remote_offer_id=remote.offer_id,
+                quantity=remote.quantity,
+                total_amount=remote.total.amount,
+                currency=remote.total.currency[:3],
+                buyer_name=remote.buyer_name,
+                conversation_id=remote.conversation_id,
+                offer_title=remote.offer_title,
+                category=remote.category,
+                remote_created_at=remote.created_at,
+                **values,
+            )
+            .on_conflict_do_update(index_elements=["connection_id", "remote_id"], set_=values)
+            .returning(Order.id, literal_column("(xmax = 0)").label("inserted"))
         )
-        .on_conflict_do_update(index_elements=["connection_id", "remote_id"], set_=values)
-        .returning(Order.id)
-    )
-    assert order_id is not None
+    ).one()
+    order_id, inserted = row.id, bool(row.inserted)
     fulfilment = await session.scalar(select(Fulfilment).where(Fulfilment.order_id == order_id))
     if fulfilment is not None:
         await _follow_remote_state(session, fulfilment, remote)
         return 0
+    if inserted and _instant_sale(listing, remote):
+        # Delivered by the marketplace from the vault: nothing to do here but announce the sale.
+        events.publish(
+            session,
+            "order.delivered",
+            {
+                "order": remote.remote_id,
+                "delivery": "instant",
+                "listing_id": listing.id if listing else None,
+            },
+            store_id=store.id,
+        )
     if remote.state is not OrderState.paid:
         return 0  # orders delivered or cancelled before the platform saw them are only recorded
     if listing is not None and listing.restock_enabled:
@@ -254,6 +268,21 @@ async def _record_order(
         idempotency_key=f"fulfil:{fulfilment_id}:start",
     )
     return 1
+
+
+INSTANT_FRESH = timedelta(hours=2)
+
+
+def _instant_sale(listing: Listing | None, remote: RemoteOrder) -> bool:
+    """An account sale the marketplace delivered from the vault, seen for the first time and
+    recent (orders from before the platform started are not announced)."""
+    if listing is None or listing.kind != "account":
+        return False
+    if utcnow() - remote.created_at > INSTANT_FRESH:
+        return False
+    if remote.state in (OrderState.delivered, OrderState.completed):
+        return True
+    return remote.state is OrderState.paid and listing.restock_enabled
 
 
 async def _follow_remote_state(

@@ -281,3 +281,19 @@ def test_every_process_maps_every_table() -> None:
         "assert {'stores', 'users', 'audit_log', 'jobs'} <= set(Base.metadata.tables)\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True, cwd=str(BACKEND))
+
+
+def test_http_client_logs_never_show_urls() -> None:
+    """Discord webhook URLs are secrets; httpx logs every request URL at INFO."""
+    import logging
+
+    from app.core.logging import configure_logging
+
+    root = logging.getLogger()
+    saved = root.handlers[:]
+    root.handlers[:] = []
+    try:
+        configure_logging("INFO")
+        assert logging.getLogger("httpx").getEffectiveLevel() >= logging.WARNING
+    finally:
+        root.handlers[:] = saved

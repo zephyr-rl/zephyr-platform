@@ -58,6 +58,13 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
     enabled: store !== null,
     refetchInterval: 15_000,
   });
+  const messages = useQuery({
+    queryKey: ["messages", store?.id, "summary"],
+    queryFn: () => api<{ needs_reply: number; urgent: number }>(`/stores/${store?.id}/messages/summary`),
+    enabled: store !== null,
+    refetchInterval: 20_000,
+  });
+  const counts: Record<string, number | undefined> = { "/orders": summary.data?.attention, "/messages": messages.data?.needs_reply };
   return (
     <nav
       aria-label="Main"
@@ -74,7 +81,7 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
         <span className="font-semibold">Zephyr Platform</span>
       </div>
       {NAV.map((item) => (
-        <NavLink key={item.to} {...item} onClick={onNavigate} count={item.to === "/orders" ? summary.data?.attention : undefined} />
+        <NavLink key={item.to} {...item} onClick={onNavigate} count={counts[item.to]} />
       ))}
       <div className="mt-auto">
         <NavLink to="/settings" label="Settings" icon={icons.settings} onClick={onNavigate} />

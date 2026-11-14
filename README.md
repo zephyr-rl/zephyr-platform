@@ -63,6 +63,18 @@ Add `--quarantine-overlaps` to hold back accounts that are in stock but also app
 extraction history. Requires `ZP_FINGERPRINT_KEY` (generate it once with `generate-key` and
 never change it: duplicates are detected with it).
 
+## Import the old notification and report settings
+
+Reads an old store folder read-only: the Discord webhooks become notification channels
+(encrypted), the old notifications become rules made from the English presets (keeping which
+fields were shown and the offers switched off), and the chat cooldown, report time, time zone
+and last reported day are copied. Safe to run again.
+
+```bash
+uv run python -m app.cli migrate-legacy-settings --store zephyrstore \
+    --folder "path/to/Eldorado API - ZephyrStore" --dry-run
+```
+
 ## Tests and checks
 
 ```bash

@@ -8,13 +8,15 @@ import {
 } from "@tanstack/react-router";
 import { Toaster } from "sonner";
 import { AppShell } from "@/components/AppShell";
-import { Card, EmptyState } from "@/components/ui";
 import { meQuery } from "@/lib/session";
 import { AutomationPage } from "@/pages/Automation";
 import { ListingsPage } from "@/pages/Listings";
 import { LoginPage } from "@/pages/Login";
+import { MessagesPage } from "@/pages/Messages";
+import { NotificationsPage } from "@/pages/Notifications";
 import { OrdersPage } from "@/pages/Orders";
 import { OverviewPage } from "@/pages/Overview";
+import { ReportsPage } from "@/pages/Reports";
 import { SettingsPage } from "@/pages/Settings";
 import { StockPage } from "@/pages/Stock";
 import { StockPoolPage } from "@/pages/StockPool";
@@ -61,21 +63,6 @@ const appRoute = createRoute({
   component: AppShell,
 });
 
-function comingSoon(path: string, title: string, stage: string) {
-  return createRoute({
-    getParentRoute: () => appRoute,
-    path,
-    component: () => (
-      <>
-        <h1 className="text-[22px] font-semibold">{title}</h1>
-        <Card>
-          <EmptyState title={`${title} arrives in ${stage}`}>See PROGRESS.md for the roadmap.</EmptyState>
-        </Card>
-      </>
-    ),
-  });
-}
-
 const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
@@ -86,9 +73,9 @@ const routeTree = rootRoute.addChildren([
     createRoute({ getParentRoute: () => appRoute, path: "/stock", component: StockPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/stock/$poolId", component: StockPoolPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/listings", component: ListingsPage }),
-    comingSoon("/messages", "Messages", "Stage 7"),
-    comingSoon("/reports", "Reports", "Stage 7"),
-    comingSoon("/notifications", "Notifications", "Stage 7"),
+    createRoute({ getParentRoute: () => appRoute, path: "/messages", component: MessagesPage }),
+    createRoute({ getParentRoute: () => appRoute, path: "/reports", component: ReportsPage }),
+    createRoute({ getParentRoute: () => appRoute, path: "/notifications", component: NotificationsPage }),
   ]),
 ]);
 

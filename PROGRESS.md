@@ -3,10 +3,12 @@
 Read `SPEC.md` first. This file says where we are and what comes next.
 
 ## Current stage
-**Stage 7 — Notifications, chat monitor, reports** (next).
+**Stage 8 — Top-ups and review reminders** (next). Stage 7 waits for one check by the owner:
+a test message on a Discord test channel (acceptance criterion of Stage 7).
 
 ## Next
-1. Stage 7: notifications (Discord bot / webhooks), chat monitor, reports.
+1. Owner: create a test channel in Discord, add its webhook in Notifications and press
+   "Send test" (and "Send test" on a rule) to confirm the messages arrive.
 2. Stage 8: top-ups and review reminders.
 
 ## Decisions
@@ -20,6 +22,13 @@ Read `SPEC.md` first. This file says where we are and what comes next.
 - 2026-11-14: **Restock has no separate "offer groups".** Listings that share a stock pool
   (the PC / PlayStation / Xbox offers of the old groups) draw from the same accounts, and the
   stock locks make sure an account goes to one vault only.
+- 2026-11-14: **Notifications are not posted for stores in shadow mode** unless the channel says
+  so ("Also post for stores in shadow mode"): during the parallel run the old system already
+  announces every sale, so the same sale would be posted twice.
+- 2026-11-14: **Revenue is the order total.** The Eldorado seller API does not return fees, so
+  reports show revenue, not net.
+- 2026-11-14: **Notification texts are English presets.** The import of the old settings keeps
+  the channels, the shown fields, the colours and the switched-off offers, not the old texts.
 - 2026-11-14: **An upload whose outcome is unknown and is not in the vault afterwards is
   quarantined, not returned to stock**: it may have been stored and sold already. The owner
   checks it before putting it back.
@@ -133,6 +142,31 @@ Read `SPEC.md` first. This file says where we are and what comes next.
     empty pool, duplicates, refused / unknown / unknown-but-stored uploads, resume rules, shadow
     mode, 4 concurrent passes, restock and chat delivery sharing a pool, history triggers,
     validation, interval, API). Browser walkthrough on the fake marketplace.
+
+- 2026-11-14: **Stage 7 — Notifications, chat monitor, reports.**
+  - Notifications: Discord webhook channels (URL encrypted, shown as a hint), rules = event +
+    store (or all) + channel + template, with English presets in the layout of the old
+    notifications (sale, buyer message, daily report, delivery problem, low / empty stock,
+    vault restocked). Template editor with variables and a live Discord-like preview, "Send
+    test" per channel and per rule, log of every message with "Send again" for failures.
+  - Delivery: one message per (event, rule), unique in the database, so a re-dispatched event
+    never posts twice; sent by a job that follows Discord's rate limit (retry_after) and retries
+    outages with backoff; a deleted webhook stops and is shown on the channel. Credentials never
+    appear in a message. HTTP client logs are silenced (they contain the webhook URL).
+  - Instant-delivery sales (from the vault) are announced once when first seen, if recent.
+  - Chat monitor (module, on by default, read-only): the old anti-spam rules (new and at most
+    5 minutes old, not answered, seller not active in the last 3 minutes, 20-minute cooldown,
+    courtesy replies on delivered orders ignored, automatic messages are not the seller,
+    CONFIRM / CANCEL left to deliveries), alert words mark a message urgent. Messages page with
+    the conversations waiting for a reply, "Mark handled", and a badge in the menu.
+  - Reports (module): numbers for any range in the store's time zone (revenue, orders,
+    accounts delivered, cancellations, by product type, by listing, stock), CSV export (safe
+    against spreadsheet formulas), Reports page with a revenue-per-day chart (with table view).
+    Daily report at the store's time, exactly once per store and day (database), sent up to
+    3 hours late if the platform was down at that time.
+  - `migrate-legacy-settings`: imports the old Discord webhooks, notification layout, chat
+    cooldown, report time, time zone (Kawai smurf: Europe/Madrid) and last reported day.
+  - Tests: 242 backend (37 new), 7 frontend. Browser walkthrough with a fake Discord.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

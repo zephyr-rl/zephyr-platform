@@ -32,6 +32,10 @@ class Platform:
     def __post_init__(self) -> None:
         self.module_context = ModuleContext(jobs=self.jobs, events=self.events)
         self.modules.register_all(self.module_context)
+        # Imported here: notifications use the platform type.
+        from app.notifications import service as notifications
+
+        notifications.register(self)
 
 
 def build_connector_registry() -> ConnectorRegistry:

@@ -296,6 +296,7 @@ export function Modal({
   description,
   children,
   wide = false,
+  extraWide = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -303,6 +304,8 @@ export function Modal({
   description?: ReactNode;
   children: ReactNode;
   wide?: boolean;
+  /** Editors with a side-by-side preview. */
+  extraWide?: boolean;
 }) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -311,7 +314,11 @@ export function Modal({
         <DialogPrimitive.Content
           className={cx(
             "fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100vh-32px)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-lg border border-line-strong bg-raised p-6 shadow-raised",
-            wide ? "w-[min(760px,calc(100vw-32px))]" : "w-[min(480px,calc(100vw-32px))]",
+            extraWide
+              ? "w-[min(1160px,calc(100vw-32px))]"
+              : wide
+                ? "w-[min(760px,calc(100vw-32px))]"
+                : "w-[min(480px,calc(100vw-32px))]",
           )}
         >
           <DialogPrimitive.Title className="text-base font-semibold">{title}</DialogPrimitive.Title>

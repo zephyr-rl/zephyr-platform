@@ -75,6 +75,29 @@ async def migrate_legacy(
     return report.ok
 
 
+async def migrate_legacy_settings(slug: str, folder: Path, *, dry_run: bool) -> None:
+    from app.legacy.settings import format_settings_report, migrate_settings
+    from app.stores.models import Store
+
+    platform = build_platform(get_settings())
+    try:
+        async with platform.db.sessionmaker() as session:
+            store_id = await session.scalar(select(Store.id).where(Store.slug == slug))
+            if store_id is None:
+                sys.exit(f"No store with slug {slug!r}. Create it in the panel first.")
+            report = await migrate_settings(
+                session,
+                platform,
+                Actor.system("migrate-legacy"),
+                folder=folder,
+                store_id=store_id,
+                dry_run=dry_run,
+            )
+    finally:
+        await platform.db.dispose()
+    print(format_settings_report(report))
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -94,6 +117,15 @@ def main(argv: list[str] | None = None) -> None:
         help="Quarantine accounts that are in stock but also in the old extraction history",
     )
     legacy.add_argument("--json", type=Path, help="Also write the report as JSON")
+    legacy_settings = sub.add_parser(
+        "migrate-legacy-settings",
+        help="Import an old store's Discord notifications and report settings (read-only)",
+    )
+    legacy_settings.add_argument("--store", required=True, help="Slug of the store")
+    legacy_settings.add_argument(
+        "--folder", required=True, type=Path, help="The old store folder (with config.json)"
+    )
+    legacy_settings.add_argument("--dry-run", action="store_true", help="Report only, save nothing")
     rec = sub.add_parser(
         "eldorado-record", help="Save redacted Eldorado responses (GET only) as test fixtures"
     )
@@ -107,6 +139,10 @@ def main(argv: list[str] | None = None) -> None:
         client_secret = getpass.getpass("Eldorado client secret: ").strip()
         for path in write_fixtures(asyncio.run(record(client_id, client_secret)), args.out):
             print(f"wrote {path}")
+        return
+
+    if args.command == "migrate-legacy-settings":
+        asyncio.run(migrate_legacy_settings(args.store, args.folder, dry_run=args.dry_run))
         return
 
     if args.command == "migrate-legacy":
