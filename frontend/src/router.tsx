@@ -13,6 +13,7 @@ import { meQuery } from "@/lib/session";
 import { AutomationPage } from "@/pages/Automation";
 import { ListingsPage } from "@/pages/Listings";
 import { LoginPage } from "@/pages/Login";
+import { OrdersPage } from "@/pages/Orders";
 import { OverviewPage } from "@/pages/Overview";
 import { SettingsPage } from "@/pages/Settings";
 import { StockPage } from "@/pages/Stock";
@@ -81,7 +82,7 @@ const routeTree = rootRoute.addChildren([
     createRoute({ getParentRoute: () => appRoute, path: "/", component: OverviewPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/automation", component: AutomationPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/settings", component: SettingsPage }),
-    comingSoon("/orders", "Orders", "Stage 5"),
+    createRoute({ getParentRoute: () => appRoute, path: "/orders", component: OrdersPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/stock", component: StockPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/stock/$poolId", component: StockPoolPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/listings", component: ListingsPage }),

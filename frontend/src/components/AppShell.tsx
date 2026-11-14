@@ -18,7 +18,19 @@ const NAV = [
   { to: "/notifications", label: "Notifications", icon: icons.notifications },
 ] as const;
 
-function NavLink({ to, label, icon, onClick }: { to: string; label: string; icon: React.ReactNode; onClick?: () => void }) {
+function NavLink({
+  to,
+  label,
+  icon,
+  onClick,
+  count,
+}: {
+  to: string;
+  label: string;
+  icon: React.ReactNode;
+  onClick?: () => void;
+  count?: number;
+}) {
   return (
     <Link
       to={to}
@@ -29,11 +41,23 @@ function NavLink({ to, label, icon, onClick }: { to: string; label: string; icon
     >
       {icon}
       {label}
+      {count ? (
+        <span className="ml-auto rounded-full bg-danger px-2 text-xs font-semibold text-on-accent" aria-label={`${count} need attention`}>
+          {count}
+        </span>
+      ) : null}
     </Link>
   );
 }
 
 function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
+  const { store } = useStores();
+  const summary = useQuery({
+    queryKey: ["orders", store?.id, "summary"],
+    queryFn: () => api<{ attention: number; waiting: number }>(`/stores/${store?.id}/orders/summary`),
+    enabled: store !== null,
+    refetchInterval: 15_000,
+  });
   return (
     <nav
       aria-label="Main"
@@ -50,7 +74,7 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
         <span className="font-semibold">Zephyr Platform</span>
       </div>
       {NAV.map((item) => (
-        <NavLink key={item.to} {...item} onClick={onNavigate} />
+        <NavLink key={item.to} {...item} onClick={onNavigate} count={item.to === "/orders" ? summary.data?.attention : undefined} />
       ))}
       <div className="mt-auto">
         <NavLink to="/settings" label="Settings" icon={icons.settings} onClick={onNavigate} />

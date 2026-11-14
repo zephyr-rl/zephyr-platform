@@ -256,3 +256,42 @@ export interface Listing {
   vault_additional_info: string | null;
   include_email_details: boolean;
 }
+
+// ---- orders ------------------------------------------------------------------------------
+
+export type FulfilmentState =
+  | "pending"
+  | "awaiting_buyer"
+  | "awaiting_approval"
+  | "reserved"
+  | "sent"
+  | "done"
+  | "manual"
+  | "needs_attention"
+  | "cancelled"
+  | "simulated";
+
+export interface OrderRow {
+  id: number;
+  remote_id: string;
+  offer_title: string | null;
+  category: string | null;
+  quantity: number;
+  total: string;
+  currency: string;
+  buyer_name: string | null;
+  remote_state: string | null;
+  created_at: string;
+  fulfilment_id: number | null;
+  fulfilment_state: FulfilmentState | null;
+  mode: string | null;
+  shadow: boolean;
+  units: number | null;
+  last_error: string | null;
+}
+
+export interface OrderDetail extends OrderRow {
+  events: { at: string; actor: string; event: string; message: string }[];
+  reserved: { login: string; state: string }[];
+  pool_name: string | null;
+}

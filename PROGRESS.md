@@ -3,12 +3,13 @@
 Read `SPEC.md` first. This file says where we are and what comes next.
 
 ## Current stage
-**Stage 5 — Deliveries** (next).
+**Stage 6 — Restock** (next).
 
 ## Next
-1. Stage 5: deliveries module — orders table, fulfilment state machine, reservations,
-   auto / assisted / message-only delivery, Twitch confirmation, with the I1/I2/I4 concurrency
-   tests. Still in shadow mode.
+1. Stage 6: restock module — keep the Eldorado vault of account listings stocked from their
+   pools (vault uploads recorded, item delivered on upload, I1), offer groups (PC / PS / Xbox
+   sharing a pool), pause/resume offers with stock. Still in shadow mode.
+2. Stage 7: notifications (Discord bot / webhooks), chat monitor, reports.
 
 ## Decisions
 - 2026-11-14: **Accounts in stock that also appear in the old extraction history**
@@ -78,6 +79,28 @@ Read `SPEC.md` first. This file says where we are and what comes next.
     reviews are nested in `reviews.results[].orderReview`, chat text comes in a `content`
     array, and the `Buyer_Does_Not_Need_It_Anymore` cancel reason exists. All recorded orders
     (102), offers (51), reviews (100) and messages (10) parse with no unknown states.
+
+- 2026-11-14: **Stage 5 — Deliveries.**
+  - Orders polled per store every minute (cursor pages), recorded once; each new paid order
+    gets exactly one fulfilment (I2: unique per order, row locked while a step runs).
+  - Fulfilment steps commit one at a time: reserve (no partial reservations; one active
+    reservation per item, enforced by the database) → send credentials in the chat → items
+    delivered (I1: once sent they never come back) → mark delivered on the marketplace.
+    Before sending, the order is re-read and the chat is checked, so a lost answer never causes
+    a second send (I4). Marketplace errors retry with backoff; after 6 tries or a final error
+    the order stops as "needs attention".
+  - Modes: manual, message only, automatic, assisted (owner approves), plus the Twitch buyer
+    confirmation (CONFIRM / CANCEL; one clarification, then a person; the owner writing in the
+    chat stops automation). Messages are the ones buyers already received from the old portal.
+  - Reply classifier: English built in, Spanish as an optional per-store pack (off by default).
+  - Kill switch: "Deliver automatically" off holds every automatic listing for approval.
+  - Shadow mode: records what would happen (mode, confirmation, stock available) and touches no
+    stock and sends nothing (I9).
+  - Orders screen: "Needs you" / "In progress" / "All", order timeline, approve (with
+    confirmation), retry, mark handled by hand (unsent accounts go back to stock), attention
+    badge in the menu, "Check for new orders".
+  - Design note: credentials are sent before marking the order delivered (the order the old
+    portal used in production), so the items are committed as delivered the moment they leave.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off
