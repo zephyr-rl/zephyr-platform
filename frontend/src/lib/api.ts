@@ -15,8 +15,12 @@ export class ApiError extends Error {
     if (Array.isArray(detail) && detail.length > 0) {
       return detail
         .map((d: { loc?: unknown[]; msg?: string }) => {
-          const field = (d.loc ?? []).filter((p) => p !== "body" && p !== "settings").join(".");
-          return field ? `${field}: ${d.msg ?? "invalid"}` : (d.msg ?? "Invalid value");
+          const field = (d.loc ?? [])
+            .filter((p) => p !== "body" && p !== "settings")
+            .join(".");
+          return field
+            ? `${field}: ${d.msg ?? "invalid"}`
+            : (d.msg ?? "Invalid value");
         })
         .join("; ");
     }
@@ -49,7 +53,8 @@ export async function api<T>(
   if (response.status === 204) return undefined as T;
   const data: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const detail = data && typeof data === "object" && "detail" in data ? data.detail : null;
+    const detail =
+      data && typeof data === "object" && "detail" in data ? data.detail : null;
     throw new ApiError(response.status, detail);
   }
   return data as T;
@@ -152,12 +157,18 @@ export interface AuditEntry {
 
 export interface JobsSummary {
   counts: Record<string, number>;
-  dead: { id: number; type: string; store_id: number | null; error: string | null }[];
+  dead: {
+    id: number;
+    type: string;
+    store_id: number | null;
+    error: string | null;
+  }[];
 }
 
 // ---- stock -------------------------------------------------------------------------------
 
-export type ItemState = "available" | "reserved" | "delivered" | "extracted" | "quarantined" | "void";
+export type ItemState =
+  "available" | "reserved" | "delivered" | "extracted" | "quarantined" | "void";
 
 export interface StockPool {
   id: number;
@@ -195,7 +206,8 @@ export interface ImportPreview {
   lines: {
     line: number;
     login_hint: string;
-    status: "new" | "in_pool" | "in_other_pool" | "previously_removed" | "repeated";
+    status:
+      "new" | "in_pool" | "in_other_pool" | "previously_removed" | "repeated";
     format: string;
     has_token: boolean;
     token_will_attach: boolean;
@@ -216,7 +228,13 @@ export interface Extraction {
 }
 
 export interface ExtractionDetail extends Extraction {
-  items: { id: number; login: string; password: string; token: string | null; extra: Record<string, string> }[];
+  items: {
+    id: number;
+    login: string;
+    password: string;
+    token: string | null;
+    extra: Record<string, string>;
+  }[];
   text: string;
   tokens_text: string;
 }
@@ -255,6 +273,34 @@ export interface Listing {
   delivery_template: string | null;
   vault_additional_info: string | null;
   include_email_details: boolean;
+  restock_enabled: boolean;
+  restock_target: number | null;
+  auto_resume: boolean;
+  vault_count: number | null;
+  last_restock_at: string | null;
+  last_restock_note: string | null;
+}
+
+export interface RestockResult {
+  uploaded: number;
+  quarantined: number;
+  resolved: number;
+  resumed: boolean;
+  shadow: boolean;
+  vault_count: number | null;
+  target: number;
+  summary: string;
+  ran: boolean;
+}
+
+export interface VaultUpload {
+  id: number;
+  item_id: number;
+  login_hint: string;
+  state: "pending" | "uploaded" | "failed";
+  error: string | null;
+  created_at: string;
+  resolved_at: string | null;
 }
 
 // ---- orders ------------------------------------------------------------------------------

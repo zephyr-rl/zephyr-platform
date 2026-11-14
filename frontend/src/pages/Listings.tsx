@@ -2,36 +2,162 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Badge, Button, Card, EmptyState, Modal, Switch, TextAreaField, TextField } from "@/components/ui";
-import { api, ApiError, type DeliveryMode, type Listing, type StockPool } from "@/lib/api";
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  Modal,
+  Switch,
+  TextAreaField,
+  TextField,
+} from "@/components/ui";
+import {
+  api,
+  ApiError,
+  type DeliveryMode,
+  type Listing,
+  type RestockResult,
+  type StockPool,
+  type StoreModule,
+  type VaultUpload,
+} from "@/lib/api";
 import { useStores } from "@/lib/session";
 import { plural } from "@/lib/stock";
 
-const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+const dateTime = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
 
-const KIND_LABEL: Record<Listing["kind"], string> = { account: "Account", item: "Item", topup: "Top-up" };
+const KIND_LABEL: Record<Listing["kind"], string> = {
+  account: "Account",
+  item: "Item",
+  topup: "Top-up",
+};
 
 const MODES: { value: DeliveryMode; label: string; help: string }[] = [
-  { value: "manual", label: "Manual", help: "Nothing is sent automatically. You deliver it yourself." },
-  { value: "assisted", label: "Assisted", help: "Stock is set aside when the order is paid; you approve the delivery." },
-  { value: "auto", label: "Automatic", help: "Stock is delivered as soon as the order is paid." },
-  { value: "text", label: "Message only", help: "Only the message below is sent; no stock is used." },
+  {
+    value: "manual",
+    label: "Manual",
+    help: "Nothing is sent automatically. You deliver it yourself.",
+  },
+  {
+    value: "assisted",
+    label: "Assisted",
+    help: "Stock is set aside when the order is paid; you approve the delivery.",
+  },
+  {
+    value: "auto",
+    label: "Automatic",
+    help: "Stock is delivered as soon as the order is paid.",
+  },
+  {
+    value: "text",
+    label: "Message only",
+    help: "Only the message below is sent; no stock is used.",
+  },
 ];
 
 function money(amount: string, currency: string): string {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Number(amount));
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency,
+  }).format(Number(amount));
 }
 
-function EditListing({ storeId, listing, pools, onClose }: { storeId: number; listing: Listing; pools: StockPool[]; onClose: () => void }) {
+interface RestockInfo {
+  enabled: boolean;
+  defaultTarget: number;
+}
+
+const UPLOAD_LABEL: Record<
+  VaultUpload["state"],
+  { label: string; tone: "success" | "warning" | "danger" }
+> = {
+  uploaded: { label: "In vault", tone: "success" },
+  pending: { label: "Checking", tone: "warning" },
+  failed: { label: "Not uploaded", tone: "danger" },
+};
+
+function RecentUploads({
+  storeId,
+  listingId,
+}: {
+  storeId: number;
+  listingId: number;
+}) {
+  const uploads = useQuery({
+    queryKey: ["listings", storeId, listingId, "uploads"],
+    queryFn: () =>
+      api<VaultUpload[]>(`/stores/${storeId}/listings/${listingId}/uploads`),
+  });
+  const rows = uploads.data ?? [];
+  if (!rows.length)
+    return (
+      <p className="text-[13px] text-muted">
+        No accounts uploaded from here yet.
+      </p>
+    );
+  return (
+    <ul
+      className="flex max-h-44 flex-col gap-1 overflow-y-auto text-[13px]"
+      aria-label="Recent uploads"
+    >
+      {rows.slice(0, 20).map((u) => (
+        <li key={u.id} className="flex items-center gap-3">
+          <span className="mono w-40 truncate">{u.login_hint}</span>
+          <Badge tone={UPLOAD_LABEL[u.state].tone}>
+            {UPLOAD_LABEL[u.state].label}
+          </Badge>
+          <span className="ml-auto text-muted">
+            {dateTime.format(new Date(u.created_at))}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function EditListing({
+  storeId,
+  listing,
+  pools,
+  restock,
+  onClose,
+}: {
+  storeId: number;
+  listing: Listing;
+  pools: StockPool[];
+  restock: RestockInfo;
+  onClose: () => void;
+}) {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<DeliveryMode>(listing.delivery_mode);
-  const [poolId, setPoolId] = useState(listing.pool_id ? String(listing.pool_id) : "");
+  const [poolId, setPoolId] = useState(
+    listing.pool_id ? String(listing.pool_id) : "",
+  );
   const [units, setUnits] = useState(String(listing.units_per_sale));
-  const [confirmation, setConfirmation] = useState(listing.require_confirmation);
+  const [confirmation, setConfirmation] = useState(
+    listing.require_confirmation,
+  );
   const [template, setTemplate] = useState(listing.delivery_template ?? "");
-  const [vaultInfo, setVaultInfo] = useState(listing.vault_additional_info ?? "");
-  const [emailDetails, setEmailDetails] = useState(listing.include_email_details);
-  const modes = listing.kind === "topup" ? MODES.filter((m) => m.value === "manual" || m.value === "text") : MODES;
+  const [vaultInfo, setVaultInfo] = useState(
+    listing.vault_additional_info ?? "",
+  );
+  const [emailDetails, setEmailDetails] = useState(
+    listing.include_email_details,
+  );
+  const [restockOn, setRestockOn] = useState(listing.restock_enabled);
+  const [target, setTarget] = useState(
+    listing.restock_target ? String(listing.restock_target) : "",
+  );
+  const [autoResume, setAutoResume] = useState(listing.auto_resume);
+  const modes =
+    listing.kind === "topup"
+      ? MODES.filter((m) => m.value === "manual" || m.value === "text")
+      : MODES;
 
   const save = useMutation({
     mutationFn: () =>
@@ -45,20 +171,50 @@ function EditListing({ storeId, listing, pools, onClose }: { storeId: number; li
           delivery_template: template,
           vault_additional_info: vaultInfo,
           include_email_details: emailDetails,
+          restock_enabled: restockOn,
+          ...(target
+            ? { restock_target: Number(target) }
+            : { clear_restock_target: true }),
+          auto_resume: autoResume,
         },
       }),
     onSuccess: async (l) => {
       await queryClient.invalidateQueries({ queryKey: ["listings", storeId] });
-      toast.success(`${l.title} saved`, { description: `Delivery: ${MODES.find((m) => m.value === l.delivery_mode)?.label}` });
+      toast.success(`${l.title} saved`, {
+        description: l.restock_enabled
+          ? `Vault restock on, keeping ${l.restock_target ?? restock.defaultTarget} account(s) in the vault.`
+          : `Delivery: ${MODES.find((m) => m.value === l.delivery_mode)?.label}`,
+      });
       onClose();
     },
   });
 
   const { reset } = save;
-  useEffect(() => reset(), [mode, poolId, units, confirmation, template, vaultInfo, emailDetails, reset]);
+  useEffect(
+    () => reset(),
+    [
+      mode,
+      poolId,
+      units,
+      confirmation,
+      template,
+      vaultInfo,
+      emailDetails,
+      restockOn,
+      target,
+      autoResume,
+      reset,
+    ],
+  );
 
   return (
-    <Modal open onOpenChange={(o) => !o && onClose()} wide title={listing.title} description={`${KIND_LABEL[listing.kind]} offer · ${money(listing.price, listing.currency)}`}>
+    <Modal
+      open
+      onOpenChange={(o) => !o && onClose()}
+      wide
+      title={listing.title}
+      description={`${KIND_LABEL[listing.kind]} offer · ${money(listing.price, listing.currency)}`}
+    >
       <form
         className="flex flex-col gap-5"
         onSubmit={(e) => {
@@ -67,14 +223,26 @@ function EditListing({ storeId, listing, pools, onClose }: { storeId: number; li
         }}
       >
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-2 text-[13px] text-muted">How is it delivered?</legend>
+          <legend className="mb-2 text-[13px] text-muted">
+            How is it delivered?
+          </legend>
+          {restockOn && (
+            <p className="text-[13px] text-muted">
+              The marketplace delivers from the vault, so delivery stays Manual
+              while the vault restock is on.
+            </p>
+          )}
           {modes.map((m) => (
-            <label key={m.value} className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 ${mode === m.value ? "border-accent bg-accent/8" : "border-line-strong"}`}>
+            <label
+              key={m.value}
+              className={`flex items-start gap-3 rounded-md border p-3 ${mode === m.value ? "border-accent bg-accent/8" : "border-line-strong"} ${restockOn && m.value !== "manual" ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+            >
               <input
                 type="radio"
                 name="mode"
                 value={m.value}
                 checked={mode === m.value}
+                disabled={restockOn && m.value !== "manual"}
                 onChange={() => setMode(m.value)}
                 aria-label={m.label}
                 aria-describedby={`mode-help-${m.value}`}
@@ -82,7 +250,10 @@ function EditListing({ storeId, listing, pools, onClose }: { storeId: number; li
               />
               <span>
                 <span className="font-medium">{m.label}</span>
-                <span id={`mode-help-${m.value}`} className="block text-[13px] text-muted">
+                <span
+                  id={`mode-help-${m.value}`}
+                  className="block text-[13px] text-muted"
+                >
                   {m.help}
                 </span>
               </span>
@@ -96,7 +267,12 @@ function EditListing({ storeId, listing, pools, onClose }: { storeId: number; li
               <label htmlFor="pool" className="text-[13px] text-muted">
                 Stock pool
               </label>
-              <select id="pool" value={poolId} onChange={(e) => setPoolId(e.target.value)} className="min-h-10 rounded-md border border-line-strong bg-bg px-3">
+              <select
+                id="pool"
+                value={poolId}
+                onChange={(e) => setPoolId(e.target.value)}
+                className="min-h-10 rounded-md border border-line-strong bg-bg px-3"
+              >
                 <option value="">No pool</option>
                 {pools
                   .filter((p) => !p.archived)
@@ -107,7 +283,16 @@ function EditListing({ storeId, listing, pools, onClose }: { storeId: number; li
                   ))}
               </select>
             </div>
-            <TextField label="Accounts per unit sold" hint="2 for a bundle of two accounts." type="number" min={1} max={100} value={units} onChange={(e) => setUnits(e.target.value)} className="w-48" />
+            <TextField
+              label="Accounts per unit sold"
+              hint="2 for a bundle of two accounts."
+              type="number"
+              min={1}
+              max={100}
+              value={units}
+              onChange={(e) => setUnits(e.target.value)}
+              className="w-48"
+            />
           </div>
         )}
 
@@ -115,16 +300,31 @@ function EditListing({ storeId, listing, pools, onClose }: { storeId: number; li
           <div className="flex items-start justify-between gap-4 rounded-md border border-line-strong p-3">
             <div>
               <div>Ask the buyer to confirm first</div>
-              <div className="text-[13px] text-muted">For Twitch drops: the buyer confirms the account is linked before the delivery is sent.</div>
+              <div className="text-[13px] text-muted">
+                For Twitch drops: the buyer confirms the account is linked
+                before the delivery is sent.
+              </div>
             </div>
-            <Switch checked={confirmation} onCheckedChange={setConfirmation} label="Ask the buyer to confirm first" />
+            <Switch
+              checked={confirmation}
+              onCheckedChange={setConfirmation}
+              label="Ask the buyer to confirm first"
+            />
           </div>
         )}
 
         {(mode !== "manual" || template) && (
           <TextAreaField
-            label={mode === "text" ? "Message to send" : "Delivery message (optional)"}
-            hint={mode === "text" ? undefined : "Leave empty to use the store's default message. {items} is replaced by the accounts."}
+            label={
+              mode === "text"
+                ? "Message to send"
+                : "Delivery message (optional)"
+            }
+            hint={
+              mode === "text"
+                ? undefined
+                : "Leave empty to use the store's default message. {items} is replaced by the accounts."
+            }
             value={template}
             onChange={(e) => setTemplate(e.target.value)}
             rows={4}
@@ -133,17 +333,80 @@ function EditListing({ storeId, listing, pools, onClose }: { storeId: number; li
 
         {listing.kind === "account" && (
           <div className="flex flex-col gap-3 rounded-md border border-line-strong p-3">
-            <div className="text-[13px] text-muted">Instant delivery (Eldorado vault)</div>
-            <TextField label="Additional info shown to the buyer" value={vaultInfo} onChange={(e) => setVaultInfo(e.target.value)} />
+            <div className="text-[13px] text-muted">
+              Instant delivery (Eldorado vault)
+            </div>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div>Keep the vault stocked</div>
+                <div className="text-[13px] text-muted">
+                  Accounts from the stock pool are uploaded to the vault when it
+                  runs low. Uploaded accounts leave the stock for good.
+                  {!restock.enabled &&
+                    " The Restock module is off for this store: turn it on in Automation."}
+                </div>
+              </div>
+              <Switch
+                checked={restockOn}
+                onCheckedChange={(on) => {
+                  setRestockOn(on);
+                  if (on) setMode("manual");
+                }}
+                label="Keep the vault stocked"
+              />
+            </div>
+            {restockOn && (
+              <div className="flex flex-wrap items-end gap-4">
+                <TextField
+                  label="Accounts kept in the vault"
+                  hint={`Empty: the store default (${restock.defaultTarget}).`}
+                  type="number"
+                  min={1}
+                  max={100}
+                  placeholder={String(restock.defaultTarget)}
+                  value={target}
+                  onChange={(e) => setTarget(e.target.value)}
+                  className="w-56"
+                />
+                <label className="flex min-h-10 items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={autoResume}
+                    onChange={(e) => setAutoResume(e.target.checked)}
+                    className="size-4 accent-accent"
+                  />
+                  Resume the offer when it was paused with an empty vault
+                </label>
+              </div>
+            )}
+            <TextField
+              label="Additional info shown to the buyer"
+              value={vaultInfo}
+              onChange={(e) => setVaultInfo(e.target.value)}
+            />
             <label className="flex items-center gap-3">
-              <input type="checkbox" checked={emailDetails} onChange={(e) => setEmailDetails(e.target.checked)} className="size-4 accent-accent" />
+              <input
+                type="checkbox"
+                checked={emailDetails}
+                onChange={(e) => setEmailDetails(e.target.checked)}
+                className="size-4 accent-accent"
+              />
               Include the e-mail login and password (Ranked Ready accounts)
             </label>
+            {listing.restock_enabled && (
+              <div className="flex flex-col gap-2 border-t border-line pt-3">
+                <div className="text-[13px] text-muted">Recent uploads</div>
+                <RecentUploads storeId={storeId} listingId={listing.id} />
+              </div>
+            )}
           </div>
         )}
 
         {save.error && (
-          <p role="alert" className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">
+          <p
+            role="alert"
+            className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger"
+          >
             {(save.error as ApiError).message}
           </p>
         )}
@@ -157,6 +420,94 @@ function EditListing({ storeId, listing, pools, onClose }: { storeId: number; li
         </div>
       </form>
     </Modal>
+  );
+}
+
+function RestockNow({
+  storeId,
+  listing,
+  shadow,
+  target,
+}: {
+  storeId: number;
+  listing: Listing;
+  shadow: boolean;
+  target: number;
+}) {
+  const queryClient = useQueryClient();
+  return (
+    <ConfirmDialog
+      trigger={<Button size="sm">Restock now</Button>}
+      title={`Restock ${listing.title}?`}
+      description={
+        shadow ? (
+          <>
+            The store is in shadow mode: the vault is read and the uploads are
+            only recorded. Nothing is sent and no stock is used.
+          </>
+        ) : (
+          <>
+            The vault is read now and topped up to <strong>{target}</strong>{" "}
+            account(s) from <strong>{listing.pool_name}</strong>. Uploaded
+            accounts are sent to the marketplace and leave the stock for good.
+          </>
+        )
+      }
+      confirmLabel={shadow ? "Run in shadow mode" : "Upload to vault"}
+      onConfirm={async () => {
+        try {
+          const r = await api<RestockResult>(
+            `/stores/${storeId}/listings/${listing.id}/restock`,
+            { method: "POST" },
+          );
+          await queryClient.invalidateQueries({
+            queryKey: ["listings", storeId],
+          });
+          await queryClient.invalidateQueries({ queryKey: ["stock", storeId] });
+          if (!r.ran)
+            toast.warning("Restock did not run", { description: r.summary });
+          else if (r.quarantined || /error|no available/i.test(r.summary))
+            toast.warning(`${listing.title}: check the result`, {
+              description: r.summary,
+            });
+          else
+            toast.success(
+              r.uploaded
+                ? `${listing.title} restocked`
+                : `${listing.title}: vault already full`,
+              { description: r.summary },
+            );
+        } catch (error) {
+          toast.error("Restock failed", {
+            description: (error as Error).message,
+          });
+        }
+      }}
+    />
+  );
+}
+
+function VaultCell({ listing, target }: { listing: Listing; target: number }) {
+  const count = listing.vault_count;
+  const low = count !== null && count < target;
+  return (
+    <div>
+      <span className="font-medium">Vault restock</span>
+      <span className={`tabular ${low ? "text-warning" : "text-muted"}`}>
+        {" "}
+        · {count ?? "?"}/{target}
+      </span>
+      {listing.last_restock_note && (
+        <div
+          className="max-w-72 truncate text-[12px] text-muted"
+          title={listing.last_restock_note}
+        >
+          {listing.last_restock_at &&
+            `${dateTime.format(new Date(listing.last_restock_at))}: `}
+          {listing.last_restock_note}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -175,22 +526,46 @@ export function ListingsPage() {
     queryFn: () => api<StockPool[]>(`/stores/${storeId}/stock/pools`),
     enabled: storeId !== undefined,
   });
+  const modules = useQuery({
+    queryKey: ["stores", storeId, "modules"],
+    queryFn: () => api<StoreModule[]>(`/stores/${storeId}/modules`),
+    enabled: storeId !== undefined,
+  });
+  const restockModule = modules.data?.find((m) => m.key === "restock");
+  const restock: RestockInfo = {
+    enabled: restockModule?.enabled ?? false,
+    defaultTarget: Number(restockModule?.settings.target_quantity ?? 1),
+  };
   const sync = useMutation({
-    mutationFn: () => api<{ created: number; updated: number; removed: number; errors: string[] }>(`/stores/${storeId}/listings/sync`, { method: "POST" }),
+    mutationFn: () =>
+      api<{
+        created: number;
+        updated: number;
+        removed: number;
+        errors: string[];
+      }>(`/stores/${storeId}/listings/sync`, { method: "POST" }),
     onSuccess: async (r) => {
       await queryClient.invalidateQueries({ queryKey: ["listings", storeId] });
-      if (r.errors.length) toast.error("Some offers could not be read", { description: r.errors.join(" · ") });
+      if (r.errors.length)
+        toast.error("Some offers could not be read", {
+          description: r.errors.join(" · "),
+        });
       else
         toast.success("Offers updated from the marketplace", {
           description: `${plural(r.created, "new offer")}, ${plural(r.updated, "updated offer")}${r.removed ? `, ${r.removed} no longer on the marketplace` : ""}.`,
         });
     },
-    onError: (error) => toast.error("Could not read the offers", { description: error.message }),
+    onError: (error) =>
+      toast.error("Could not read the offers", { description: error.message }),
   });
 
   if (!store || storeId === undefined) return null;
   const rows = listings.data ?? [];
-  const lastSync = rows.map((l) => l.last_synced_at).filter(Boolean).sort().pop();
+  const lastSync = rows
+    .map((l) => l.last_synced_at)
+    .filter(Boolean)
+    .sort()
+    .pop();
 
   return (
     <>
@@ -198,11 +573,17 @@ export function ListingsPage() {
         <div>
           <h1 className="text-[22px] font-semibold">Listings</h1>
           <p className="mt-1 text-muted">
-            {store.name}'s offers on the marketplace and how each one is delivered.
+            {store.name}'s offers on the marketplace and how each one is
+            delivered.
             {lastSync && ` Last read ${dateTime.format(new Date(lastSync))}.`}
           </p>
         </div>
-        <Button variant="primary" className="ml-auto" busy={sync.isPending} onClick={() => sync.mutate()}>
+        <Button
+          variant="primary"
+          className="ml-auto"
+          busy={sync.isPending}
+          onClick={() => sync.mutate()}
+        >
           Read offers from marketplace
         </Button>
       </div>
@@ -210,8 +591,11 @@ export function ListingsPage() {
       <Card>
         {listings.data && rows.length === 0 ? (
           <EmptyState title="No listings yet">
-            Connect the marketplace in <Link to="/settings" className="text-accent underline">Settings</Link>, then read the offers. Reading
-            changes nothing on the marketplace.
+            Connect the marketplace in{" "}
+            <Link to="/settings" className="text-accent underline">
+              Settings
+            </Link>
+            , then read the offers. Reading changes nothing on the marketplace.
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
@@ -220,7 +604,9 @@ export function ListingsPage() {
                 <tr className="text-left text-muted">
                   <th className="px-4 py-2.5 font-medium">Offer</th>
                   <th className="px-4 py-2.5 text-right font-medium">Price</th>
-                  <th className="px-4 py-2.5 text-right font-medium">On marketplace</th>
+                  <th className="px-4 py-2.5 text-right font-medium">
+                    On marketplace
+                  </th>
                   <th className="px-4 py-2.5 font-medium">Stock pool</th>
                   <th className="px-4 py-2.5 font-medium">Delivery</th>
                   <th className="px-4 py-2.5" />
@@ -228,7 +614,10 @@ export function ListingsPage() {
               </thead>
               <tbody>
                 {rows.map((l) => (
-                  <tr key={l.id} className={`border-t border-line ${l.removed_remotely ? "opacity-60" : ""}`}>
+                  <tr
+                    key={l.id}
+                    className={`border-t border-line ${l.removed_remotely ? "opacity-60" : ""}`}
+                  >
                     <td className="px-4 py-2.5">
                       <div className="font-medium">{l.title}</div>
                       <div className="mt-1 flex flex-wrap gap-1.5">
@@ -238,15 +627,25 @@ export function ListingsPage() {
                         ) : l.remote_state === "active" ? (
                           <Badge tone="success">Active</Badge>
                         ) : (
-                          <Badge tone="warning">{l.remote_state === "paused" ? "Paused" : "Closed"}</Badge>
+                          <Badge tone="warning">
+                            {l.remote_state === "paused" ? "Paused" : "Closed"}
+                          </Badge>
                         )}
                       </div>
                     </td>
-                    <td className="tabular px-4 py-2.5 text-right">{money(l.price, l.currency)}</td>
-                    <td className="tabular px-4 py-2.5 text-right">{l.remote_quantity ?? "—"}</td>
+                    <td className="tabular px-4 py-2.5 text-right">
+                      {money(l.price, l.currency)}
+                    </td>
+                    <td className="tabular px-4 py-2.5 text-right">
+                      {l.remote_quantity ?? "—"}
+                    </td>
                     <td className="px-4 py-2.5">
                       {l.pool_id ? (
-                        <Link to="/stock/$poolId" params={{ poolId: String(l.pool_id) }} className="hover:underline">
+                        <Link
+                          to="/stock/$poolId"
+                          params={{ poolId: String(l.pool_id) }}
+                          className="hover:underline"
+                        >
                           {l.pool_name}
                         </Link>
                       ) : (
@@ -254,14 +653,45 @@ export function ListingsPage() {
                       )}
                     </td>
                     <td className="px-4 py-2.5">
-                      {MODES.find((m) => m.value === l.delivery_mode)?.label}
-                      {l.units_per_sale > 1 && <span className="text-muted"> · {l.units_per_sale} per unit</span>}
-                      {l.require_confirmation && <span className="text-muted"> · confirmation</span>}
+                      {l.restock_enabled ? (
+                        <VaultCell
+                          listing={l}
+                          target={l.restock_target ?? restock.defaultTarget}
+                        />
+                      ) : (
+                        <>
+                          {
+                            MODES.find((m) => m.value === l.delivery_mode)
+                              ?.label
+                          }
+                          {l.units_per_sale > 1 && (
+                            <span className="text-muted">
+                              {" "}
+                              · {l.units_per_sale} per unit
+                            </span>
+                          )}
+                          {l.require_confirmation && (
+                            <span className="text-muted"> · confirmation</span>
+                          )}
+                        </>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <Button size="sm" onClick={() => setEditing(l)}>
-                        Edit
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        {l.restock_enabled &&
+                          restock.enabled &&
+                          !l.removed_remotely && (
+                            <RestockNow
+                              storeId={storeId}
+                              listing={l}
+                              shadow={store.shadow_mode}
+                              target={l.restock_target ?? restock.defaultTarget}
+                            />
+                          )}
+                        <Button size="sm" onClick={() => setEditing(l)}>
+                          Edit
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -270,7 +700,15 @@ export function ListingsPage() {
           </div>
         )}
       </Card>
-      {editing && <EditListing storeId={storeId} listing={editing} pools={pools.data ?? []} onClose={() => setEditing(null)} />}
+      {editing && (
+        <EditListing
+          storeId={storeId}
+          listing={editing}
+          pools={pools.data ?? []}
+          restock={restock}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </>
   );
 }

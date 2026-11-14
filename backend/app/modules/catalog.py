@@ -68,15 +68,22 @@ class DeliveriesSettings(_Settings):
         description="Sent after the order is cancelled at the buyer's request.",
     )
     reply_languages: list[str] = Field(
-        default_factory=lambda: ["en"],
+        default_factory=lambda: ["en", "es"],
         description='Languages recognised in buyer replies: "en" (always) and "es".',
     )
     lookback_hours: int = Field(72, ge=1, le=720, description="How far back orders are read.")
 
 
 class RestockSettings(_Settings):
-    interval_minutes: int = Field(10, ge=1, le=1440, description="How often listings are checked.")
-    target_quantity: int = Field(5, ge=1, le=500, description="Units kept visible per listing.")
+    interval_minutes: int = Field(
+        1, ge=1, le=1440, description="How often the vault of each listing is checked."
+    )
+    target_quantity: int = Field(
+        1,
+        ge=1,
+        le=100,
+        description="Accounts kept in the vault for listings without their own target.",
+    )
 
 
 class TopUpsSettings(_Settings):
@@ -142,6 +149,17 @@ class DeliveriesModule(DeclaredModule):
         )
 
 
+class RestockModule(DeclaredModule):
+    def register(self, ctx: ModuleContext) -> None:
+        from app.modules.restock import jobs as restock_jobs
+
+        restock_jobs.register(ctx)
+        # Runs every minute; each listing is checked when its interval has passed.
+        ctx.periodic.append(
+            PeriodicTask("restock", "restock.run", timedelta(seconds=60), module_key=self.key)
+        )
+
+
 V1_MODULES: tuple[DeclaredModule, ...] = (
     DeliveriesModule(
         "deliveries",
@@ -151,10 +169,10 @@ V1_MODULES: tuple[DeclaredModule, ...] = (
         frozenset({Capability.ORDERS, Capability.DELIVER}),
         default_enabled=True,
     ),
-    DeclaredModule(
+    RestockModule(
         "restock",
         "Restock listings",
-        "Keeps listings stocked from the matching stock pools.",
+        "Keeps the vault of instant-delivery listings stocked from their pools.",
         RestockSettings,
         frozenset({Capability.OFFERS, Capability.VAULT}),
     ),

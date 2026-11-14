@@ -496,19 +496,10 @@ async def test_seller_writing_in_the_chat_stops_automation(
     assert shop.market.deliveries == []
 
 
-async def test_spanish_replies_need_the_language_pack(
+async def test_spanish_replies_are_recognised_by_default(
     session: AsyncSession, shop: Shop, platform: Platform
 ) -> None:
     await _awaiting_buyer(session, shop)
-    await stores.set_module(
-        session,
-        platform,
-        ACTOR,
-        shop.store_id,
-        "deliveries",
-        settings={"reply_languages": ["en", "es"]},
-    )
-    await session.commit()
     shop.buyer_says("confirmo")
     await service.check_replies(platform, shop.store_id)
     await shop.run_jobs()

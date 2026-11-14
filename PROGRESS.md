@@ -3,19 +3,26 @@
 Read `SPEC.md` first. This file says where we are and what comes next.
 
 ## Current stage
-**Stage 6 — Restock** (next).
+**Stage 7 — Notifications, chat monitor, reports** (next).
 
 ## Next
-1. Stage 6: restock module — keep the Eldorado vault of account listings stocked from their
-   pools (vault uploads recorded, item delivered on upload, I1), offer groups (PC / PS / Xbox
-   sharing a pool), pause/resume offers with stock. Still in shadow mode.
-2. Stage 7: notifications (Discord bot / webhooks), chat monitor, reports.
+1. Stage 7: notifications (Discord bot / webhooks), chat monitor, reports.
+2. Stage 8: top-ups and review reminders.
 
 ## Decisions
 - 2026-11-14: **Accounts in stock that also appear in the old extraction history**
   (ZephyrStore 157, Kawai 5, Jewelry 0) stay *available*, as in the old system. The owner
   decided not to quarantine them, so the cut-over migration runs without
   `--quarantine-overlaps`.
+- 2026-11-14: **Spanish buyer replies are recognised in every store by default**
+  (`reply_languages = ["en", "es"]`), at the owner's request for ZephyrStore, Kawai smurf and
+  Jewelry. A store can still turn it off in Automation → Deliveries.
+- 2026-11-14: **Restock has no separate "offer groups".** Listings that share a stock pool
+  (the PC / PlayStation / Xbox offers of the old groups) draw from the same accounts, and the
+  stock locks make sure an account goes to one vault only.
+- 2026-11-14: **An upload whose outcome is unknown and is not in the vault afterwards is
+  quarantined, not returned to stock**: it may have been stored and sold already. The owner
+  checks it before putting it back.
 
 ## Done
 - 2026-11-14: `SPEC.md` approved (v1.0).
@@ -92,7 +99,8 @@ Read `SPEC.md` first. This file says where we are and what comes next.
   - Modes: manual, message only, automatic, assisted (owner approves), plus the Twitch buyer
     confirmation (CONFIRM / CANCEL; one clarification, then a person; the owner writing in the
     chat stops automation). Messages are the ones buyers already received from the old portal.
-  - Reply classifier: English built in, Spanish as an optional per-store pack (off by default).
+  - Reply classifier: English built in, Spanish as a per-store pack (on by default since the
+    decision of 2026-11-14).
   - Kill switch: "Deliver automatically" off holds every automatic listing for approval.
   - Shadow mode: records what would happen (mode, confirmation, stock available) and touches no
     stock and sends nothing (I9).
@@ -101,6 +109,30 @@ Read `SPEC.md` first. This file says where we are and what comes next.
     badge in the menu, "Check for new orders".
   - Design note: credentials are sent before marking the order delivered (the order the old
     portal used in production), so the items are committed as delivered the moment they leave.
+
+- 2026-11-14: **Stage 6 — Restock.**
+  - Per listing (account offers only): "Keep the vault stocked", accounts kept in the vault
+    (or the store default), resume the offer when it was paused with an empty vault. Delivery
+    stays Manual on these listings (the marketplace delivers from the vault), and paid orders on
+    them are only recorded.
+  - A pass per listing, under a database lock (two workers never upload to the same vault):
+    read the vault → resolve earlier uploads with an unknown outcome → top up from the pool →
+    resume the offer if it was paused and something was uploaded.
+  - Every upload is a `vault_uploads` row (history: never deleted, a resolved row is final),
+    committed as "pending" with the account reserved *before* calling the marketplace. Success:
+    the account is delivered for good (I1). Refused: back to stock. Unknown (timeout): stays
+    pending and is resolved by reading the vault on the next pass.
+  - Accounts already in the vault are quarantined instead of uploaded twice.
+  - Shadow mode records "would upload" / "would resume" and touches no stock (I9).
+  - Runs every minute; each listing is checked when its interval (store setting) has passed.
+    "Restock now" in Listings runs one listing immediately, after a confirmation dialog that
+    says the accounts leave the stock for good (or that nothing is sent, in shadow mode).
+  - Listings screen: vault count against the target, last result, recent uploads (login hint
+    and state only, never passwords).
+  - Tests: 205 backend (19 new: top-up, refill after a sale, e-mail details, store default,
+    empty pool, duplicates, refused / unknown / unknown-but-stored uploads, resume rules, shadow
+    mode, 4 concurrent passes, restock and chat delivery sharing a pool, history triggers,
+    validation, interval, API). Browser walkthrough on the fake marketplace.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

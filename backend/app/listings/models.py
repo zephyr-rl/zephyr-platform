@@ -16,6 +16,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -69,3 +70,50 @@ class Listing(TimestampMixin, Base):
     delivery_template: Mapped[str | None] = mapped_column(Text)
     vault_additional_info: Mapped[str | None] = mapped_column(Text)
     include_email_details: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    # Restock (account listings with instant delivery from the marketplace vault).
+    restock_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    restock_target: Mapped[int | None] = mapped_column(Integer)  # None: the store default
+    auto_resume: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    vault_count: Mapped[int | None] = mapped_column(Integer)
+    last_restock_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_restock_note: Mapped[str | None] = mapped_column(Text)
+
+
+class VaultUploadState(enum.StrEnum):
+    pending = "pending"  # item reserved, upload sent or about to be; outcome not known yet
+    uploaded = "uploaded"  # confirmed in the vault: the item is delivered (I1)
+    failed = "failed"  # confirmed not in the vault: the item went back to stock
+
+
+class VaultUpload(Base):
+    """One stock item sent to a listing's vault. Replaces the old "upload ledger"."""
+
+    __tablename__ = "vault_uploads"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    store_id: Mapped[int] = mapped_column(
+        ForeignKey("stores.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    listing_id: Mapped[int] = mapped_column(
+        ForeignKey("listings.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    # I1: an item is uploaded at most once, to one listing, ever.
+    item_id: Mapped[int] = mapped_column(
+        ForeignKey("stock_items.id", ondelete="RESTRICT"), nullable=False, unique=True
+    )
+    state: Mapped[VaultUploadState] = mapped_column(
+        Enum(
+            VaultUploadState,
+            name="vault_upload_state",
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=False,
+        default=VaultUploadState.pending,
+    )
+    remote_entry_id: Mapped[str | None] = mapped_column(String(120))
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

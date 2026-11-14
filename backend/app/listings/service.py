@@ -121,6 +121,9 @@ SETTINGS = (
     "delivery_template",
     "vault_additional_info",
     "include_email_details",
+    "restock_enabled",
+    "restock_target",
+    "auto_resume",
 )
 
 
@@ -156,6 +159,18 @@ async def update_listing(
         raise ListingError("Message-only delivery needs the message to send.")
     if not 1 <= int(merged["units_per_sale"]) <= 100:
         raise ListingError("Units per sale must be between 1 and 100.")
+    if merged["restock_target"] is not None and not 1 <= int(merged["restock_target"]) <= 100:
+        raise ListingError("The vault target must be between 1 and 100.")
+    if merged["restock_enabled"]:
+        if listing.kind != OfferKind.account.value:
+            raise ListingError("Only account listings with instant delivery can be restocked.")
+        if pool_id is None:
+            raise ListingError("Restock needs a stock pool.")
+        if mode is not DeliveryMode.manual:
+            raise ListingError(
+                "Restocked listings are delivered by the marketplace from the vault: "
+                "set the delivery to Manual."
+            )
 
     for key in SETTINGS:
         setattr(listing, key, merged[key] if key != "delivery_mode" else mode)

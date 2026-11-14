@@ -208,6 +208,8 @@ async def _record_order(
         return 0
     if remote.state is not OrderState.paid:
         return 0  # orders delivered or cancelled before the platform saw them are only recorded
+    if listing is not None and listing.restock_enabled:
+        return 0  # instant delivery: the marketplace delivers from the vault
 
     mode, confirmation, units, pool_id = _mode_for(listing, settings)
     fulfilment_id = await session.scalar(
