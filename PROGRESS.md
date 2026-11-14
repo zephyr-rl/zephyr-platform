@@ -10,10 +10,11 @@ Read `SPEC.md` first. This file says where we are and what comes next.
    read-only live check, listings mapped to stock pools.
 2. Stage 5: deliveries module (auto, assisted, text) with the I1/I2/I4 concurrency tests.
 
-## Open decisions
-- **Accounts in stock that also appear in the old extraction history** (ZephyrStore 157,
-  Kawai 5, Jewelry 0): kept *available* by default (that is how the old system sells them
-  today) and listed in the migration report. `--quarantine-overlaps` holds them back instead.
+## Decisions
+- 2026-11-14: **Accounts in stock that also appear in the old extraction history**
+  (ZephyrStore 157, Kawai 5, Jewelry 0) stay *available*, as in the old system. The owner
+  decided not to quarantine them, so the cut-over migration runs without
+  `--quarantine-overlaps`.
 
 ## Done
 - 2026-11-14: `SPEC.md` approved (v1.0).
