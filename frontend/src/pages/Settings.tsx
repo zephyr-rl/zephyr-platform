@@ -119,6 +119,12 @@ function StoresCard() {
 
 // ---- marketplace connections -------------------------------------------------------------
 
+const FIELD_LABEL: Record<string, string> = {
+  client_id: "Client ID",
+  client_secret: "Client secret",
+  api_key: "API key",
+};
+
 function ConnectionsCard() {
   const { store } = useStores();
   const queryClient = useQueryClient();
@@ -187,7 +193,7 @@ function ConnectionsCard() {
         </ul>
       ) : (
         <EmptyState title="No marketplace connected">
-          The Eldorado connector arrives in Stage 4. The test marketplace can be used meanwhile.
+          Add the Eldorado seller API credentials (Client ID and secret) from your Eldorado seller settings.
         </EmptyState>
       )}
       <form
@@ -217,8 +223,8 @@ function ConnectionsCard() {
         {selected?.credential_fields.map((field) => (
           <TextField
             key={field}
-            label={field.replace(/_/g, " ")}
-            type="password"
+            label={FIELD_LABEL[field] ?? field.replace(/_/g, " ")}
+            type={/secret|key|password|token/.test(field) ? "password" : "text"}
             autoComplete="off"
             value={credentials[field] ?? ""}
             onChange={(e) => setCredentials((c) => ({ ...c, [field]: e.target.value }))}

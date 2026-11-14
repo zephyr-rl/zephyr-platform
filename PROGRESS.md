@@ -3,12 +3,14 @@
 Read `SPEC.md` first. This file says where we are and what comes next.
 
 ## Current stage
-**Stage 4 — Eldorado connector** (next).
+**Stage 5 — Deliveries** (next).
 
 ## Next
-1. Stage 4: Eldorado connector with recorded fixtures (orders, offers, vault, chat, reviews),
-   read-only live check, listings mapped to stock pools.
-2. Stage 5: deliveries module (auto, assisted, text) with the I1/I2/I4 concurrency tests.
+1. Owner: run `python -m app.cli eldorado-record --out tests/fixtures/eldorado/recorded` once
+   (read-only, redacted) so the fixtures can be checked against real responses.
+2. Stage 5: deliveries module — orders table, fulfilment state machine, reservations,
+   auto / assisted / message-only delivery, Twitch confirmation, with the I1/I2/I4 concurrency
+   tests. Still in shadow mode.
 
 ## Decisions
 - 2026-11-14: **Accounts in stock that also appear in the old extraction history**
@@ -54,6 +56,24 @@ Read `SPEC.md` first. This file says where we are and what comes next.
     items; a second run creates nothing. (Run again on fresh copies at cut-over.)
   - Panel: Stock (pools, search, recent extractions), pool page (filters, import preview,
     extract, bulk actions, item history), Overview shows stock and low pools.
+
+- 2026-11-14: **Stage 4 — Eldorado connector and listings.**
+  - `app/connectors/eldorado`: seller API + TalkJS chat behind the connector protocol. OAuth
+    token cached and refreshed on 401, per-connection rate limit, reads retried on
+    timeouts/429/5xx, writes never retried blindly; failed deliveries, cancels and vault uploads
+    re-read the remote state first (I4). Orders queried per state (the API returns one page of
+    50), order lookup by exact id only (the old portal could return a different order), unknown
+    states never mapped to known ones, offers of every kind with kind-specific endpoints.
+  - 27 contract tests on fixtures (no network), including "shadow mode sends no write".
+    Fixtures are built from the field names the old portal used; `eldorado-record` refreshes
+    them from the live API with GET requests only and redacts secrets.
+  - Listings: read-only sync of every offer, fulfilment settings per listing (stock pool,
+    manual / assisted / automatic / message-only, accounts per unit, Twitch confirmation,
+    messages, vault info, e-mail details). New listings start as **manual**.
+  - `open_connector()` applies shadow mode at run time: writes become `shadow.<action>` audit
+    entries and never reach the marketplace.
+  - Panel: Listings screen (read offers, edit delivery per offer), Eldorado credentials form.
+  - No call was made to the real Eldorado account (no credentials in this environment).
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

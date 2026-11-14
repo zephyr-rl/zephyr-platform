@@ -146,7 +146,8 @@ async def update_listing(
         if pool.archived:
             raise ListingError(f"The pool {pool.name} is archived.")
     if mode in NEEDS_POOL and pool_id is None:
-        raise ListingError(f"{mode.value.title()} delivery needs a stock pool.")
+        label = "Automatic" if mode is DeliveryMode.auto else "Assisted"
+        raise ListingError(f"{label} delivery needs a stock pool.")
     if listing.kind == OfferKind.topup.value and mode in NEEDS_POOL:
         raise ListingError(
             "Top-up listings are fulfilled by hand or with a message, not from stock."

@@ -11,6 +11,7 @@ import { AppShell } from "@/components/AppShell";
 import { Card, EmptyState } from "@/components/ui";
 import { meQuery } from "@/lib/session";
 import { AutomationPage } from "@/pages/Automation";
+import { ListingsPage } from "@/pages/Listings";
 import { LoginPage } from "@/pages/Login";
 import { OverviewPage } from "@/pages/Overview";
 import { SettingsPage } from "@/pages/Settings";
@@ -83,7 +84,7 @@ const routeTree = rootRoute.addChildren([
     comingSoon("/orders", "Orders", "Stage 5"),
     createRoute({ getParentRoute: () => appRoute, path: "/stock", component: StockPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/stock/$poolId", component: StockPoolPage }),
-    comingSoon("/listings", "Listings", "Stage 4"),
+    createRoute({ getParentRoute: () => appRoute, path: "/listings", component: ListingsPage }),
     comingSoon("/messages", "Messages", "Stage 7"),
     comingSoon("/reports", "Reports", "Stage 7"),
     comingSoon("/notifications", "Notifications", "Stage 7"),

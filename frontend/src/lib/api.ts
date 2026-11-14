@@ -229,3 +229,30 @@ export interface ItemEvent {
   to_state: string | null;
   details: Record<string, unknown> | null;
 }
+
+// ---- listings ----------------------------------------------------------------------------
+
+export type DeliveryMode = "manual" | "assisted" | "auto" | "text";
+
+export interface Listing {
+  id: number;
+  connection_id: number;
+  connector: string;
+  remote_offer_id: string;
+  kind: "account" | "item" | "topup";
+  title: string;
+  remote_state: string;
+  price: string;
+  currency: string;
+  remote_quantity: number | null;
+  removed_remotely: boolean;
+  last_synced_at: string | null;
+  pool_id: number | null;
+  pool_name: string | null;
+  delivery_mode: DeliveryMode;
+  units_per_sale: number;
+  require_confirmation: boolean;
+  delivery_template: string | null;
+  vault_additional_info: string | null;
+  include_email_details: boolean;
+}

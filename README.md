@@ -13,7 +13,9 @@ backend/    FastAPI API, worker, scheduler (Python 3.12, PostgreSQL 16)
   app/stores/      stores, marketplace connections, per-store module switches
   app/stock/       stock pools and items, multi-format importer, extraction, moves
   app/legacy/      read-only importer for the old stores' databases
-  app/connectors/  connector protocol, fake marketplace, shadow (dry-run) wrapper
+  app/connectors/  connector protocol, Eldorado (seller API + chat), fake marketplace,
+                   shadow (dry-run) wrapper
+  app/listings/    marketplace offers and how each one is delivered
   app/modules/     feature modules (declared; behaviour arrives stage by stage)
   app/workers/     worker and scheduler processes
   migrations/      Alembic
