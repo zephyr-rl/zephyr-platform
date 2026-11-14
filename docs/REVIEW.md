@@ -63,6 +63,10 @@ Starting it needs the VPS and the owner. Prepared:
 - Notification test messages from a rule use the rule's store name and say they are examples.
 - Automation: settings with a fixed set of choices are shown as a select.
 - HTTP client logs are silenced (they would show webhook URLs).
+- Found by the new CI test of the whole stack: opening the panel by IP address (no domain)
+  failed at the TLS handshake. Fixed with `ZP_DEFAULT_SNI` (set it to the server IP when there
+  is no domain; documented in `.env.example` and DEPLOY.md). CI now starts the stack exactly as
+  on the VPS and gets the panel and the API through Caddy.
 
 ## What I need from you
 

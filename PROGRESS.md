@@ -232,8 +232,9 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     imported earlier that is no longer in the old stock (sold or removed by the old system
     during the shadow period), matched by login so an account moved to another category there
     is kept. Without it, those accounts would be on sale twice.
-  - CI starts the whole production stack (`docker compose up`) and checks the API answers
-    through Caddy.
+  - CI starts the whole production stack (`docker compose up`) and checks the API and the panel
+    answer through Caddy. It found that access by IP (no domain) failed at the TLS handshake:
+    browsers send no server name to an IP; fixed with `ZP_DEFAULT_SNI` in the Caddyfile.
   - Tests: 275 backend (3 new).
 
 ## Notes
