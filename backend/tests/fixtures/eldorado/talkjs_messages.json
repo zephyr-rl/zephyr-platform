@@ -1,0 +1,6 @@
+{
+  "data": [
+    {"id": "msg-2", "senderId": "seller-talk-1", "text": "Thank you for your purchase!", "createdAt": 1794600060000},
+    {"id": "msg-1", "senderId": "buyer-talk-9", "text": "Hi, the account does not work", "createdAt": 1794600000000}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "results": [
+    {
+      "id": "item-offer-1",
+      "offerTitle": "Twitch drops linked to your account",
+      "offerState": "Active",
+      "pricePerUnit": {"amount": 4.99, "currency": "USD"},
+      "category": "CustomItem",
+      "gameCategoryTitle": "Rocket League Items"
+    }
+  ],
+  "recordCount": 1
+}

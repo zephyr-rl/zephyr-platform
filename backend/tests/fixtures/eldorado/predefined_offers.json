@@ -1,0 +1,9 @@
+[
+  {
+    "id": "topup-1",
+    "gameCategoryTitle": "Rocket League Credits",
+    "category": "TopUp",
+    "offerState": "Active",
+    "pricePerUnit": {"amount": 1.5, "currency": "USD"}
+  }
+]

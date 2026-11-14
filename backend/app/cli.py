@@ -94,7 +94,20 @@ def main(argv: list[str] | None = None) -> None:
         help="Quarantine accounts that are in stock but also in the old extraction history",
     )
     legacy.add_argument("--json", type=Path, help="Also write the report as JSON")
+    rec = sub.add_parser(
+        "eldorado-record", help="Save redacted Eldorado responses (GET only) as test fixtures"
+    )
+    rec.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
+
+    if args.command == "eldorado-record":
+        from app.connectors.eldorado.record import record, write_fixtures
+
+        client_id = input("Eldorado client id: ").strip()
+        client_secret = getpass.getpass("Eldorado client secret: ").strip()
+        for path in write_fixtures(asyncio.run(record(client_id, client_secret)), args.out):
+            print(f"wrote {path}")
+        return
 
     if args.command == "migrate-legacy":
         ok = asyncio.run(

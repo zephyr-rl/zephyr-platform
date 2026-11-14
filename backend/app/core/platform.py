@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from app.connectors import fake
 from app.connectors.base import ConnectorRegistry
+from app.connectors.eldorado import connector as eldorado
 from app.core import models  # noqa: F401  (every table must be mapped in every process)
 from app.core.config import Settings
 from app.core.crypto import Fingerprinter, SecretBox
@@ -35,6 +36,7 @@ class Platform:
 
 def build_connector_registry() -> ConnectorRegistry:
     registry = ConnectorRegistry()
+    registry.register(eldorado.INFO, lambda creds: eldorado.EldoradoConnector(creds))
     registry.register(fake.INFO, lambda creds: fake.FakeConnector(creds))
     return registry
 

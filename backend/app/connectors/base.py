@@ -35,6 +35,13 @@ class OrderState(enum.StrEnum):
     cancelled = "cancelled"
     refunded = "refunded"
     disputed = "disputed"
+    unknown = "unknown"  # a state this connector does not know yet: never acted on
+
+
+class OfferKind(enum.StrEnum):
+    account = "account"  # instant delivery from the marketplace vault
+    item = "item"  # delivered by the seller (chat)
+    topup = "topup"  # fulfilled by hand
 
 
 class OfferState(enum.StrEnum):
@@ -68,6 +75,9 @@ class RemoteOrder(_Model):
     buyer_id: str | None = None
     conversation_id: str | None = None
     created_at: datetime
+    remote_state: str | None = None  # the marketplace's own word for the state
+    offer_title: str | None = None
+    category: str | None = None
     raw: dict[str, Any] = Field(default_factory=dict, repr=False)
 
 
@@ -77,6 +87,7 @@ class RemoteOffer(_Model):
     state: OfferState
     price: Money
     quantity: int | None = None
+    kind: OfferKind = OfferKind.account
     raw: dict[str, Any] = Field(default_factory=dict, repr=False)
 
 
@@ -93,8 +104,15 @@ class RemoteResult(_Model):
 
 
 class VaultEntry(_Model):
+    """Credentials stored in a marketplace offer for instant delivery."""
+
     remote_id: str | None = None
-    content: str = Field(repr=False)
+    login: str
+    password: str = Field(repr=False)
+    email: str | None = None
+    email_password: str | None = Field(None, repr=False)
+    email_provider_url: str | None = None
+    additional_info: str | None = None
 
 
 class ChatMessage(_Model):

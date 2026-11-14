@@ -1,0 +1,57 @@
+{
+  "results": [
+    {
+      "id": "order-paid-item",
+      "offerId": "item-offer-1",
+      "state": {"state": "Paid"},
+      "createdDate": "2026-11-13T21:40:00Z",
+      "purchaseQuantity": 2,
+      "totalPrice": {"amount": 9.98, "currency": "USD"},
+      "buyerUsername": "buyer_one",
+      "talkJsConversationId": "conv-paid-item",
+      "orderOfferDetails": {
+        "offerTitle": "Twitch drops linked to your account",
+        "gameCategoryTitle": "Rocket League Items",
+        "category": "CustomItem"
+      }
+    },
+    {
+      "id": "order-delivered-account",
+      "offerId": "acc-offer-1",
+      "state": {"state": "Delivered"},
+      "createdDate": "2026-11-13T18:05:00Z",
+      "purchaseQuantity": 1,
+      "totalPrice": {"amount": 4.99, "currency": "USD"},
+      "buyerUsername": "buyer_two",
+      "talkJsConversationId": "conv-delivered",
+      "orderOfferDetails": {
+        "offerTitle": "RLCS x6 drops account",
+        "gameCategoryTitle": "Rocket League Accounts",
+        "category": "Account",
+        "tradeEnvironmentProperties": [{"name": "Device", "value": "PC"}]
+      }
+    },
+    {
+      "id": "order-received",
+      "offerId": "acc-offer-1",
+      "state": {"state": "Received"},
+      "createdDate": "2026-11-12T10:00:00Z",
+      "purchaseQuantity": 1,
+      "totalPrice": {"amount": 4.99, "currency": "USD"},
+      "buyerUsername": "buyer_three",
+      "talkJsConversationId": "conv-received",
+      "orderOfferDetails": {"offerTitle": "RLCS x6 drops account", "category": "Account"}
+    },
+    {
+      "id": "order-canceled",
+      "offerId": "item-offer-1",
+      "state": {"state": "Canceled"},
+      "createdDate": "2026-11-11T09:00:00Z",
+      "purchaseQuantity": 1,
+      "totalPrice": {"amount": 4.99, "currency": "USD"},
+      "buyerUsername": "buyer_four",
+      "orderOfferDetails": {"offerTitle": "Twitch drops linked to your account", "category": "CustomItem"}
+    }
+  ],
+  "recordCount": 4
+}

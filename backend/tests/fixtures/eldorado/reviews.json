@@ -1,0 +1,9 @@
+{
+  "results": [
+    {"id": "review-1", "orderId": "order-received", "reviewRating": "Positive", "reviewText": "Fast delivery", "createdDate": "2026-11-13T12:00:00Z"},
+    {"id": "review-2", "orderId": "order-old", "feedbackRating": "Negative", "createdDate": "2026-11-12T12:00:00Z"},
+    {"id": "review-3", "orderId": "order-x", "rating": 4, "comment": "ok", "createdDate": "2026-11-01T12:00:00Z"},
+    {"id": "review-4", "orderId": "order-y", "createdDate": "2026-11-13T12:00:00Z"}
+  ],
+  "nextCursor": null
+}

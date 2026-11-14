@@ -1,0 +1,22 @@
+{
+  "results": [
+    {
+      "id": "acc-offer-1",
+      "offerTitle": "RLCS x6 drops account",
+      "offerState": "Active",
+      "quantity": 3,
+      "pricePerUnit": {"amount": 4.99, "currency": "USD"},
+      "category": "Account",
+      "gameSeoAlias": "rocket-league-accounts"
+    },
+    {
+      "id": "acc-offer-2",
+      "offerTitle": "Ranked Ready account",
+      "offerState": "Paused",
+      "quantity": 0,
+      "pricePerUnit": {"amount": 7.5, "currency": "USD"},
+      "category": "Account"
+    }
+  ],
+  "recordCount": 2
+}
