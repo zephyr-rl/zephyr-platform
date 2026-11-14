@@ -7,6 +7,7 @@ from app.identity.models import LoginAttempt, User, UserSession
 from app.listings.models import Listing, VaultUpload
 from app.modules.chat_monitor.models import ChatThread
 from app.modules.reports.models import DailyReport
+from app.modules.review_reminders.models import ReviewReminder
 from app.notifications.models import NotificationChannel, NotificationDelivery, NotificationRule
 from app.orders.models import Fulfilment, FulfilmentEvent, Order, Reservation
 from app.stock.models import (
@@ -35,6 +36,7 @@ __all__ = [
     "Order",
     "OutboxEvent",
     "Reservation",
+    "ReviewReminder",
     "StockExtraction",
     "StockImport",
     "StockItem",

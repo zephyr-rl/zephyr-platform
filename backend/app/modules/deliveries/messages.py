@@ -7,6 +7,15 @@ from typing import Protocol
 
 DEFAULT_DELIVERY_MESSAGE = "Thank you for your purchase!\n\n{items}"
 
+# Top-ups: the old portal's welcome message ({buyerUsername} became {buyer}).
+DEFAULT_TOPUP_INSTRUCTIONS = (
+    "Hi {buyer}! Thank you for your purchase.\n\n"
+    "Please send your login details (Epic Games / Xbox / PlayStation) here so we can start "
+    "processing your top-up order shortly.\n\n"
+    "If you have Two-Factor Authentication (2FA) enabled, please be ready to provide the security "
+    "code when requested. Thank you!"
+)
+
 DEFAULT_CONFIRMATION_SINGLE = (
     "⚠️ IMPORTANT NOTICE: EPIC GAMES LINKING RESTRICTION ⚠️\n\n"
     "Hello! Thank you for your purchase.\n\n"

@@ -44,6 +44,7 @@ class FulfilmentState(enum.StrEnum):
     sent = "sent"  # credentials sent to the buyer; items are delivered
     done = "done"  # order marked delivered on the marketplace
     manual = "manual"  # nothing automatic: the owner delivers it
+    awaiting_owner = "awaiting_owner"  # top-up: instructions sent, the owner does the top-up
     needs_attention = "needs_attention"  # stopped; a person must look at it
     cancelled = "cancelled"  # order cancelled (by the buyer, the owner or the marketplace)
     simulated = "simulated"  # shadow mode: decisions recorded, nothing sent, no stock used
@@ -56,6 +57,7 @@ ACTIVE_STATES = frozenset(
         FulfilmentState.awaiting_approval,
         FulfilmentState.reserved,
         FulfilmentState.sent,
+        FulfilmentState.awaiting_owner,
     }
 )
 

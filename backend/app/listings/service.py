@@ -155,7 +155,13 @@ async def update_listing(
         raise ListingError(
             "Top-up listings are fulfilled by hand or with a message, not from stock."
         )
-    if mode is DeliveryMode.text and not (merged["delivery_template"] or "").strip():
+    is_topup = listing.kind == OfferKind.topup.value
+    if (
+        mode is DeliveryMode.text
+        and not is_topup
+        and not (merged["delivery_template"] or "").strip()
+    ):
+        # (Top-ups fall back to the instructions set in the Top-Ups module.)
         raise ListingError("Message-only delivery needs the message to send.")
     if not 1 <= int(merged["units_per_sale"]) <= 100:
         raise ListingError("Units per sale must be between 1 and 100.")

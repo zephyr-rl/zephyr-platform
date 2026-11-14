@@ -125,15 +125,28 @@ function EditListing({
   listing,
   pools,
   restock,
+  topups,
   onClose,
 }: {
   storeId: number;
   listing: Listing;
   pools: StockPool[];
   restock: RestockInfo;
+  topups?: StoreModule;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const isTopup = listing.kind === "topup";
+  const topupSettings = (topups?.settings ?? {}) as {
+    skip_offers?: string[];
+    offer_messages?: Record<string, string>;
+  };
+  const skipped = (topupSettings.skip_offers ?? []).includes(
+    listing.remote_offer_id,
+  );
+  const importedMessage =
+    topupSettings.offer_messages?.[listing.remote_offer_id];
+  const [sendInstructions, setSendInstructions] = useState(!skipped);
   const [mode, setMode] = useState<DeliveryMode>(listing.delivery_mode);
   const [poolId, setPoolId] = useState(
     listing.pool_id ? String(listing.pool_id) : "",
@@ -142,7 +155,10 @@ function EditListing({
   const [confirmation, setConfirmation] = useState(
     listing.require_confirmation,
   );
-  const [template, setTemplate] = useState(listing.delivery_template ?? "");
+  const [template, setTemplate] = useState(
+    listing.delivery_template ??
+      (listing.kind === "topup" ? (importedMessage ?? "") : ""),
+  );
   const [vaultInfo, setVaultInfo] = useState(
     listing.vault_additional_info ?? "",
   );
@@ -160,30 +176,67 @@ function EditListing({
       : MODES;
 
   const save = useMutation({
-    mutationFn: () =>
-      api<Listing>(`/stores/${storeId}/listings/${listing.id}`, {
-        method: "PATCH",
-        body: {
-          delivery_mode: mode,
-          ...(poolId ? { pool_id: Number(poolId) } : { clear_pool: true }),
-          units_per_sale: Number(units),
-          require_confirmation: confirmation,
-          delivery_template: template,
-          vault_additional_info: vaultInfo,
-          include_email_details: emailDetails,
-          restock_enabled: restockOn,
-          ...(target
-            ? { restock_target: Number(target) }
-            : { clear_restock_target: true }),
-          auto_resume: autoResume,
+    mutationFn: async () => {
+      const saved = await api<Listing>(
+        `/stores/${storeId}/listings/${listing.id}`,
+        {
+          method: "PATCH",
+          body: {
+            delivery_mode: isTopup ? "manual" : mode,
+            ...(poolId ? { pool_id: Number(poolId) } : { clear_pool: true }),
+            units_per_sale: Number(units),
+            require_confirmation: confirmation,
+            delivery_template: template,
+            vault_additional_info: vaultInfo,
+            include_email_details: emailDetails,
+            restock_enabled: restockOn,
+            ...(target
+              ? { restock_target: Number(target) }
+              : { clear_restock_target: true }),
+            auto_resume: autoResume,
+          },
         },
-      }),
+      );
+      // Top-ups: the instructions switch lives in the Top-Ups module settings, and an imported
+      // per-offer message moves onto the listing.
+      if (
+        isTopup &&
+        topups &&
+        (sendInstructions === skipped || importedMessage !== undefined)
+      ) {
+        const offer = listing.remote_offer_id;
+        const skip = new Set(topupSettings.skip_offers ?? []);
+        if (sendInstructions) skip.delete(offer);
+        else skip.add(offer);
+        const messages = { ...(topupSettings.offer_messages ?? {}) };
+        delete messages[offer];
+        await api<StoreModule>(`/stores/${storeId}/modules/topups`, {
+          method: "PUT",
+          body: {
+            settings: {
+              ...topups.settings,
+              skip_offers: [...skip],
+              offer_messages: messages,
+            },
+            expected_version: topups.version,
+          },
+        });
+        await queryClient.invalidateQueries({
+          queryKey: ["stores", storeId, "modules"],
+        });
+      }
+      return saved;
+    },
     onSuccess: async (l) => {
       await queryClient.invalidateQueries({ queryKey: ["listings", storeId] });
       toast.success(`${l.title} saved`, {
-        description: l.restock_enabled
-          ? `Vault restock on, keeping ${l.restock_target ?? restock.defaultTarget} account(s) in the vault.`
-          : `Delivery: ${MODES.find((m) => m.value === l.delivery_mode)?.label}`,
+        description: isTopup
+          ? sendInstructions && topups?.enabled
+            ? "The instructions are sent when a top-up is paid."
+            : "No instructions are sent for this listing."
+          : l.restock_enabled
+            ? `Vault restock on, keeping ${l.restock_target ?? restock.defaultTarget} account(s) in the vault.`
+            : `Delivery: ${MODES.find((m) => m.value === l.delivery_mode)?.label}`,
       });
       onClose();
     },
@@ -222,44 +275,74 @@ function EditListing({
           save.mutate();
         }}
       >
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-2 text-[13px] text-muted">
-            How is it delivered?
-          </legend>
-          {restockOn && (
-            <p className="text-[13px] text-muted">
-              The marketplace delivers from the vault, so delivery stays Manual
-              while the vault restock is on.
-            </p>
-          )}
-          {modes.map((m) => (
-            <label
-              key={m.value}
-              className={`flex items-start gap-3 rounded-md border p-3 ${mode === m.value ? "border-accent bg-accent/8" : "border-line-strong"} ${restockOn && m.value !== "manual" ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
-            >
-              <input
-                type="radio"
-                name="mode"
-                value={m.value}
-                checked={mode === m.value}
-                disabled={restockOn && m.value !== "manual"}
-                onChange={() => setMode(m.value)}
-                aria-label={m.label}
-                aria-describedby={`mode-help-${m.value}`}
-                className="mt-1 size-4 accent-accent"
+        {isTopup && (
+          <div className="flex flex-col gap-3 rounded-md border border-line-strong p-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div>Send the top-up instructions when an order is paid</div>
+                <div className="text-[13px] text-muted">
+                  The platform never marks a top-up delivered: the order waits
+                  in Orders → Needs you until you do it.
+                  {!topups?.enabled &&
+                    " The Top-Ups module is off for this store: turn it on in Automation."}
+                </div>
+              </div>
+              <Switch
+                checked={sendInstructions}
+                onCheckedChange={setSendInstructions}
+                label="Send the top-up instructions"
               />
-              <span>
-                <span className="font-medium">{m.label}</span>
-                <span
-                  id={`mode-help-${m.value}`}
-                  className="block text-[13px] text-muted"
-                >
-                  {m.help}
+            </div>
+            <TextAreaField
+              label="Instructions for this listing (optional)"
+              hint="Empty: the instructions set in Automation → Top-Ups. {buyer}, {product}, {quantity} and {order} are replaced."
+              value={template}
+              onChange={(e) => setTemplate(e.target.value)}
+              rows={5}
+            />
+          </div>
+        )}
+
+        {!isTopup && (
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-2 text-[13px] text-muted">
+              How is it delivered?
+            </legend>
+            {restockOn && (
+              <p className="text-[13px] text-muted">
+                The marketplace delivers from the vault, so delivery stays
+                Manual while the vault restock is on.
+              </p>
+            )}
+            {modes.map((m) => (
+              <label
+                key={m.value}
+                className={`flex items-start gap-3 rounded-md border p-3 ${mode === m.value ? "border-accent bg-accent/8" : "border-line-strong"} ${restockOn && m.value !== "manual" ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+              >
+                <input
+                  type="radio"
+                  name="mode"
+                  value={m.value}
+                  checked={mode === m.value}
+                  disabled={restockOn && m.value !== "manual"}
+                  onChange={() => setMode(m.value)}
+                  aria-label={m.label}
+                  aria-describedby={`mode-help-${m.value}`}
+                  className="mt-1 size-4 accent-accent"
+                />
+                <span>
+                  <span className="font-medium">{m.label}</span>
+                  <span
+                    id={`mode-help-${m.value}`}
+                    className="block text-[13px] text-muted"
+                  >
+                    {m.help}
+                  </span>
                 </span>
-              </span>
-            </label>
-          ))}
-        </fieldset>
+              </label>
+            ))}
+          </fieldset>
+        )}
 
         {listing.kind !== "topup" && (
           <div className="flex flex-wrap gap-4">
@@ -313,7 +396,7 @@ function EditListing({
           </div>
         )}
 
-        {(mode !== "manual" || template) && (
+        {!isTopup && (mode !== "manual" || template) && (
           <TextAreaField
             label={
               mode === "text"
@@ -532,6 +615,7 @@ export function ListingsPage() {
     enabled: storeId !== undefined,
   });
   const restockModule = modules.data?.find((m) => m.key === "restock");
+  const topupsModule = modules.data?.find((m) => m.key === "topups");
   const restock: RestockInfo = {
     enabled: restockModule?.enabled ?? false,
     defaultTarget: Number(restockModule?.settings.target_quantity ?? 1),
@@ -653,7 +737,17 @@ export function ListingsPage() {
                       )}
                     </td>
                     <td className="px-4 py-2.5">
-                      {l.restock_enabled ? (
+                      {l.kind === "topup" ? (
+                        topupsModule?.enabled &&
+                        !(
+                          (topupsModule.settings.skip_offers as
+                            string[] | undefined) ?? []
+                        ).includes(l.remote_offer_id) ? (
+                          "Top-up: instructions sent, then you"
+                        ) : (
+                          "Top-up: by hand, nothing sent"
+                        )
+                      ) : l.restock_enabled ? (
                         <VaultCell
                           listing={l}
                           target={l.restock_target ?? restock.defaultTarget}
@@ -706,6 +800,7 @@ export function ListingsPage() {
           listing={editing}
           pools={pools.data ?? []}
           restock={restock}
+          topups={topupsModule}
           onClose={() => setEditing(null)}
         />
       )}

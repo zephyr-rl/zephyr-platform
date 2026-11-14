@@ -32,6 +32,36 @@ function SettingField({
 }) {
   const label = schema.title ?? name;
   const hint = schema.description;
+  if (schema.ui === "listings") {
+    const count = Array.isArray(value) ? value.length : value && typeof value === "object" ? Object.keys(value).length : 0;
+    return (
+      <div className="text-[13px] text-muted">
+        {label}: {count} set. Change them on each listing in Listings.
+      </div>
+    );
+  }
+  if (schema.enum) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={`setting-${name}`} className="text-[13px] text-muted">
+          {label}
+        </label>
+        <select
+          id={`setting-${name}`}
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          className="min-h-10 max-w-64 rounded-md border border-line-strong bg-bg px-3"
+        >
+          {schema.enum.map((option) => (
+            <option key={option} value={option}>
+              {option.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase())}
+            </option>
+          ))}
+        </select>
+        {hint && <span className="text-xs text-muted">{hint}</span>}
+      </div>
+    );
+  }
   if (schema.type === "boolean") {
     return (
       <div className="flex items-start justify-between gap-4">

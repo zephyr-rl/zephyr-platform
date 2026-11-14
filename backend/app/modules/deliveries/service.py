@@ -41,7 +41,7 @@ from app.core import audit, events, jobs
 from app.core.db import utcnow
 from app.core.platform import Platform
 from app.listings.models import DeliveryMode, Listing
-from app.modules.catalog import DeliveriesSettings
+from app.modules.catalog import DeliveriesSettings, TopUpsSettings
 from app.modules.deliveries import messages
 from app.modules.deliveries.replies import Reply, classify
 from app.orders.models import (
@@ -120,12 +120,20 @@ class PollResult:
     updated: int = 0
 
 
+TOPUP = "topup"  # fulfilment mode: instructions sent, then the owner does the top-up
+
+
 def _mode_for(
-    listing: Listing | None, settings: DeliveriesSettings
+    listing: Listing | None, settings: DeliveriesSettings, topups: TopUpsSettings | None = None
 ) -> tuple[str, bool, int, int | None]:
     """(mode, require_confirmation, units per sale, pool) for a new order."""
     if listing is None:
         return DeliveryMode.manual.value, False, 1, None
+    if listing.kind == "topup":
+        # A top-up is never marked delivered by the platform: at most the instructions are sent
+        # (when the Top-Ups module is on and the offer is not switched off there).
+        send = topups is not None and listing.remote_offer_id not in topups.skip_offers
+        return (TOPUP if send else DeliveryMode.manual.value), False, 1, None
     mode = listing.delivery_mode
     if mode is DeliveryMode.auto and not settings.auto_deliver:
         mode = DeliveryMode.assisted  # kill switch: hold automatic deliveries for approval
@@ -141,6 +149,16 @@ async def poll_store(platform: Platform, store_id: int) -> PollResult:
         if store is None:
             return result
         settings = await settings_for(session, store_id)
+        topups_row = await session.scalar(
+            select(StoreModule).where(
+                StoreModule.store_id == store_id, StoreModule.module_key == "topups"
+            )
+        )
+        topups = (
+            TopUpsSettings.model_validate(topups_row.settings)
+            if topups_row is not None and topups_row.enabled
+            else None
+        )
         connections = list(
             await session.scalars(
                 select(MarketplaceConnection).where(MarketplaceConnection.store_id == store_id)
@@ -155,7 +173,7 @@ async def poll_store(platform: Platform, store_id: int) -> PollResult:
                 await connector.aclose()
             for remote in remote_orders:
                 result.seen += 1
-                created = await _record_order(session, store, connection, remote, settings)
+                created = await _record_order(session, store, connection, remote, settings, topups)
                 result.new_paid += created
         await session.commit()
     return result
@@ -167,6 +185,7 @@ async def _record_order(
     connection: MarketplaceConnection,
     remote: RemoteOrder,
     settings: DeliveriesSettings,
+    topups: TopUpsSettings | None = None,
 ) -> int:
     listing = None
     if remote.offer_id:
@@ -225,7 +244,7 @@ async def _record_order(
     if listing is not None and listing.restock_enabled:
         return 0  # instant delivery: the marketplace delivers from the vault
 
-    mode, confirmation, units, pool_id = _mode_for(listing, settings)
+    mode, confirmation, units, pool_id = _mode_for(listing, settings, topups)
     fulfilment_id = await session.scalar(
         insert(Fulfilment)
         .values(
@@ -317,7 +336,10 @@ async def _follow_remote_state(
                 session, "order.cancelled", {"order": remote.remote_id}, store_id=locked.store_id
             )
     elif remote.state in (OrderState.delivered, OrderState.completed):
-        if locked.state is FulfilmentState.sent:
+        if locked.state is FulfilmentState.awaiting_owner:
+            set_state(locked, FulfilmentState.done)
+            note(session, locked, "done", "Top-up marked delivered on the marketplace.")
+        elif locked.state is FulfilmentState.sent:
             set_state(locked, FulfilmentState.done)
             note(session, locked, "done", "The marketplace shows the order as delivered.")
         else:
@@ -539,6 +561,8 @@ async def _simulate(ctx: Context) -> bool:
         )
     elif f.mode == DeliveryMode.text.value:
         lines.append("Would send the listing's message and mark the order delivered.")
+    elif f.mode == TOPUP:
+        lines.append("Top-up: would send the instructions; you would do the top-up.")
     else:
         lines.append("Manual listing: you deliver it.")
     note(s, f, "simulated", " ".join(lines))
@@ -566,6 +590,9 @@ async def _start(ctx: Context) -> bool:
     if current.state is not OrderState.paid:
         await _follow_remote_state(s, f, current)
         return False
+
+    if f.mode == TOPUP:
+        return await _send_topup_instructions(ctx)
 
     if f.mode == DeliveryMode.text.value:
         listing = await s.get(Listing, ctx.order.listing_id) if ctx.order.listing_id else None
@@ -608,6 +635,49 @@ async def _start(ctx: Context) -> bool:
         return False
     set_state(f, FulfilmentState.reserved)
     return True
+
+
+async def topup_settings(session: AsyncSession, store_id: int) -> TopUpsSettings:
+    row = await session.scalar(
+        select(StoreModule).where(
+            StoreModule.store_id == store_id, StoreModule.module_key == "topups"
+        )
+    )
+    return TopUpsSettings.model_validate(row.settings if row else {})
+
+
+async def _already_in_chat(ctx: Context, text: str) -> bool:
+    """After a failed attempt the message may have been sent anyway (I4): look before resending."""
+    if ctx.fulfilment.attempts == 0 or not ctx.order.conversation_id:
+        return False
+    since = ctx.fulfilment.state_changed_at - timedelta(minutes=1)
+    chat = await (await ctx.remote()).chat_list_messages(ctx.order.conversation_id, since)
+    head = text.strip()[:60]
+    return any(m.from_seller and m.text.strip().startswith(head) for m in chat)
+
+
+async def _send_topup_instructions(ctx: Context) -> bool:
+    f, s, order = ctx.fulfilment, ctx.session, ctx.order
+    listing = await s.get(Listing, order.listing_id) if order.listing_id else None
+    cfg = await topup_settings(s, f.store_id)
+    template = (
+        (listing.delivery_template if listing else None)
+        or cfg.offer_messages.get(order.remote_offer_id or "")
+        or cfg.instructions
+    )
+    text = messages.fill(
+        template,
+        buyer=order.buyer_name or "there",
+        product=order.offer_title or "your top-up",
+        quantity=order.quantity,
+        order=order.remote_id[:8],
+    )
+    if not await _already_in_chat(ctx, text):
+        await _send(ctx, text, kind="instructions")
+    set_state(f, FulfilmentState.awaiting_owner)
+    f.last_error = None
+    note(s, f, "instructions_sent", "Top-up instructions sent. Waiting for you to do the top-up.")
+    return False
 
 
 async def _approved(ctx: Context) -> bool:

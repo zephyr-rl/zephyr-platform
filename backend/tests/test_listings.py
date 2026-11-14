@@ -148,8 +148,8 @@ async def test_fulfilment_settings_are_validated(
         await service.update_listing(
             session, ACTOR, topup, {"delivery_mode": "assisted", "pool_id": pool.id}
         )
-    with pytest.raises(service.ListingError, match="message to send"):
-        await service.update_listing(session, ACTOR, topup, {"delivery_mode": "text"})
+    # Top-ups need no message of their own: the Top-Ups module's instructions are used.
+    await service.update_listing(session, ACTOR, topup, {"delivery_mode": "text"})
 
     await service.update_listing(
         session,
@@ -162,8 +162,13 @@ async def test_fulfilment_settings_are_validated(
             "require_confirmation": True,
         },
     )
+    account_id = str(account.id)
     await session.commit()
-    entry = await session.scalar(select(AuditLog).where(AuditLog.action == "listing.updated"))
+    entry = await session.scalar(
+        select(AuditLog).where(
+            AuditLog.action == "listing.updated", AuditLog.entity_id == account_id
+        )
+    )
     assert entry is not None
     assert entry.before["delivery_mode"] == "manual" and entry.after["delivery_mode"] == "auto"
     assert entry.after["units_per_sale"] == 2

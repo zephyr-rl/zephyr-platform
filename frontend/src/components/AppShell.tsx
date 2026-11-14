@@ -13,6 +13,7 @@ const NAV = [
   { to: "/stock", label: "Stock", icon: icons.stock },
   { to: "/listings", label: "Listings", icon: icons.listings },
   { to: "/messages", label: "Messages", icon: icons.messages },
+  { to: "/reminders", label: "Review reminders", icon: icons.reviews },
   { to: "/reports", label: "Reports", icon: icons.reports },
   { to: "/automation", label: "Automation", icon: icons.automation },
   { to: "/notifications", label: "Notifications", icon: icons.notifications },

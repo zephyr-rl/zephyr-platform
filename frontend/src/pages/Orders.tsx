@@ -17,12 +17,13 @@ export const FULFILMENT: Record<FulfilmentState, { label: string; tone: Tone }> 
   sent: { label: "Sent, confirming", tone: "progress" },
   done: { label: "Delivered", tone: "success" },
   manual: { label: "Manual", tone: "neutral" },
+  awaiting_owner: { label: "Top-up: waiting for you", tone: "warning" },
   needs_attention: { label: "Needs attention", tone: "danger" },
   cancelled: { label: "Cancelled", tone: "neutral" },
   simulated: { label: "Simulated", tone: "neutral" },
 };
 
-const MODE_LABEL: Record<string, string> = { manual: "Manual", assisted: "Assisted", auto: "Automatic", text: "Message only" };
+const MODE_LABEL: Record<string, string> = { manual: "Manual", assisted: "Assisted", auto: "Automatic", text: "Message only", topup: "Top-up" };
 const FILTERS = [
   { key: "attention", label: "Needs you" },
   { key: "waiting", label: "In progress" },

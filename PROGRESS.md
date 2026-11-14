@@ -3,13 +3,13 @@
 Read `SPEC.md` first. This file says where we are and what comes next.
 
 ## Current stage
-**Stage 8 — Top-ups and review reminders** (next). Stage 7 waits for one check by the owner:
+**Stage 9 — Panel screens, desktop and mobile** (next). Stage 7 waits for one check by the owner:
 a test message on a Discord test channel (acceptance criterion of Stage 7).
 
 ## Next
 1. Owner: create a test channel in Discord, add its webhook in Notifications and press
    "Send test" (and "Send test" on a rule) to confirm the messages arrive.
-2. Stage 8: top-ups and review reminders.
+2. Stage 9: panel screens on the design, desktop and mobile walkthrough.
 
 ## Decisions
 - 2026-11-14: **Accounts in stock that also appear in the old extraction history**
@@ -22,6 +22,14 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
 - 2026-11-14: **Restock has no separate "offer groups".** Listings that share a stock pool
   (the PC / PlayStation / Xbox offers of the old groups) draw from the same accounts, and the
   stock locks make sure an account goes to one vault only.
+- 2026-11-14: **A top-up is never marked delivered by the platform.** When the Top-Ups module is
+  on, the instructions are sent and the order waits in Orders → Needs you ("Top-up: waiting for
+  you") until the owner does it and marks it delivered on the marketplace.
+- 2026-11-14: **Review reminders start in manual mode** (as the old tool): the owner picks the
+  buyers and starts each batch; automatic mode is a setting. A batch never goes past the day's
+  limit. Nothing is queued or sent while the store is in shadow mode.
+- 2026-11-14: **Owner away (from 17:00): stages continue without approvals.** Every change is
+  listed in `docs/REVIEW.md` so it can be reviewed and changed afterwards.
 - 2026-11-14: **Notifications are not posted for stores in shadow mode** unless the channel says
   so ("Also post for stores in shadow mode"): during the parallel run the old system already
   announces every sale, so the same sale would be posted twice.
@@ -167,6 +175,32 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
   - `migrate-legacy-settings`: imports the old Discord webhooks, notification layout, chat
     cooldown, report time, time zone (Kawai smurf: Europe/Madrid) and last reported day.
   - Tests: 242 backend (37 new), 7 frontend. Browser walkthrough with a fake Discord.
+
+- 2026-11-14: **Stage 8 — Top-ups and review reminders.**
+  - Top-ups (module): when a top-up order is paid, the instructions are sent once in the order
+    chat (the listing's own message, else the imported per-offer message, else the module's
+    default) and the order goes to the new state "Top-up: waiting for you" (Needs you). When the
+    owner marks it delivered on the marketplace, it is done; if the buyer cancels, cancelled.
+    The platform never marks a top-up delivered. Before sending again after a failed attempt the
+    chat is read (I4). Listings: per top-up listing, "Send the top-up instructions" and its own
+    message. Module off, or the offer switched off: nothing is sent (manual).
+  - Review reminders (module): candidates = delivered/completed orders at least `delay_hours`
+    and at most `lookback_days` old, never reminded, one per buyer within the cooldown, after
+    the review filter (skip negative / skip reviewed / remind all, read from the marketplace's
+    reviews). One reminder per order ever (database). Sent one at a time through the job queue
+    with a random pause (20-50 s by default), at most `daily_cap` a day, re-checking the review
+    right before sending; committed as "sending" before the message goes out and checked in the
+    chat after an interruption. Retryable errors: up to 3 tries. Page "Review reminders": today's
+    count against the limit, the buyers to remind (select and send, with confirmation), empty the
+    queue, history.
+  - `migrate-legacy-settings` also imports `topup_config.json` (default and per-offer messages,
+    offers switched off; `{buyerUsername}` → `{buyer}`, `{productName}` → `{product}`,
+    `{orderId}` → `{order}`) and `buyer_reminder_config.json` / `buyer_reminder_history.json`
+    (settings, and every order already reminded so it is never reminded again).
+  - Automation: settings with a fixed set of choices are shown as a select; settings edited per
+    listing are shown as a count with a pointer to Listings.
+  - Tests: 268 backend (26 new), 7 frontend. Browser walkthrough (top-up in Needs you, listing
+    switch, Automation, reminders queued and sent).
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

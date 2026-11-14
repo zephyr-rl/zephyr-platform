@@ -5,6 +5,10 @@
   keeping which fields were shown, the colours, and the offers switched off.
 - ``config.json`` → the chat cooldown, the daily report time and the store time zone.
 - ``daily_report_cache.json`` → the last day already reported, so it is not reported again.
+- ``topup_config.json`` → the Top-Ups module: instructions, per-offer messages, offers switched
+  off.
+- ``buyer_reminder_config.json`` + ``buyer_reminder_history.json`` → the Review reminders
+  settings, and every order already reminded (never reminded again).
 
 The old texts are not copied: the platform's messages are in English. Idempotent: running it
 again changes nothing that is already there.
@@ -15,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -27,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import audit
 from app.core.platform import Platform
 from app.modules.reports.models import DailyReport
+from app.modules.review_reminders.models import ReminderState, ReviewReminder
 from app.notifications import catalog, discord
 from app.notifications import service as notifications
 from app.notifications.models import NotificationChannel, NotificationRule
@@ -64,6 +69,7 @@ class SettingsReport:
     rules_created: list[str] = field(default_factory=list)
     rules_present: list[str] = field(default_factory=list)
     module_settings: dict[str, Any] = field(default_factory=dict)
+    reminders_imported: int = 0
     timezone: str | None = None
     last_reported: str | None = None
     notes: list[str] = field(default_factory=list)
@@ -76,6 +82,136 @@ def _read(folder: Path, name: str) -> dict[str, Any]:
     with path.open(encoding="utf-8") as handle:
         data = json.load(handle)
     return data if isinstance(data, dict) else {}
+
+
+# Old placeholders → the platform's.
+PLACEHOLDERS = {
+    "{buyerUsername}": "{buyer}",
+    "{productName}": "{product}",
+    "{orderId}": "{order}",
+}
+
+
+def _placeholders(text: str) -> str:
+    for old, new in PLACEHOLDERS.items():
+        text = text.replace(old, new)
+    return text.strip()
+
+
+def _when(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+
+def _read_list(folder: Path, name: str) -> list[dict[str, Any]]:
+    path = folder / name
+    if not path.is_file():
+        return []
+    with path.open(encoding="utf-8") as handle:
+        data = json.load(handle)
+    return [d for d in data if isinstance(d, dict)] if isinstance(data, list) else []
+
+
+async def _import_topups(
+    session: AsyncSession,
+    platform: Platform,
+    actor: audit.Actor,
+    store: Store,
+    folder: Path,
+    report: SettingsReport,
+) -> None:
+    cfg = _read(folder, "topup_config.json")
+    if not cfg:
+        return
+    default = _placeholders(str(cfg.get("defaultWelcomeMessage") or "")) or None
+    offers = cfg.get("offerSettings") or {}
+    messages = {
+        str(oid): _placeholders(str(o.get("customMessage") or ""))
+        for oid, o in offers.items()
+        if isinstance(o, dict) and o.get("customMessage")
+    }
+    if default:
+        messages = {k: v for k, v in messages.items() if v != default}
+    skip = sorted(
+        str(oid) for oid, o in offers.items() if isinstance(o, dict) and o.get("enabled") is False
+    )
+    settings: dict[str, Any] = {"offer_messages": messages, "skip_offers": skip}
+    if default:
+        settings["instructions"] = default
+    await stores.set_module(
+        session,
+        platform,
+        actor,
+        store.id,
+        "topups",
+        enabled=bool(cfg.get("enabled", True)),
+        settings=settings,
+    )
+    report.module_settings["topups"] = (
+        f"{len(messages)} offer message(s), {len(skip)} offer(s) without instructions"
+    )
+
+
+async def _import_reminders(
+    session: AsyncSession,
+    platform: Platform,
+    actor: audit.Actor,
+    store: Store,
+    folder: Path,
+    report: SettingsReport,
+) -> None:
+    cfg = _read(folder, "buyer_reminder_config.json")
+    if not cfg:
+        return
+    filters = {"negative_only": "skip_negative", "all": "skip_reviewed", "none": "remind_all"}
+    low = max(5, min(600, int(float(cfg.get("minDelaySeconds", 20)))))
+    settings: dict[str, Any] = {
+        "lookback_days": max(1, min(60, int(cfg.get("daysLookback", 14)))),
+        "min_delay_seconds": low,
+        "max_delay_seconds": max(low, min(1800, int(float(cfg.get("maxDelaySeconds", 50))))),
+        "daily_cap": max(1, min(200, int(cfg.get("maxMessagesPerBatch", 35)))),
+        "review_filter": filters.get(str(cfg.get("reviewFilter")), "skip_negative"),
+        "buyer_cooldown_days": max(0, min(90, int(cfg.get("cooldownDaysPerBuyer", 14)))),
+        "automatic": False,  # the old tool was started by hand
+    }
+    if cfg.get("template"):
+        settings["message_template"] = _placeholders(str(cfg["template"]))[:4000]
+    # Only the settings: the module stays switched as it is (off for a new store).
+    await stores.set_module(
+        session, platform, actor, store.id, "review_reminders", settings=settings
+    )
+    report.module_settings["review_reminders"] = (
+        f"filter {settings['review_filter']}, cap {settings['daily_cap']}/day, manual batches"
+    )
+
+    known: dict[str, tuple[str | None, datetime | None]] = {}
+    for entry in _read_list(folder, "buyer_reminder_history.json"):
+        oid = str(entry.get("orderId") or "")
+        if oid:
+            known[oid] = (entry.get("buyer") or None, _when(entry.get("timestamp")))
+    reminded = {str(o) for o in cfg.get("remindedOrderIds") or []} | set(known)
+    for oid in sorted(reminded):
+        buyer, at = known.get(oid, (None, None))
+        inserted = await session.scalar(
+            insert(ReviewReminder)
+            .values(
+                store_id=store.id,
+                remote_order_id=oid,
+                buyer_name=buyer,
+                state=ReminderState.sent,
+                queued_by="old system",
+                note="Reminded by the old system.",
+                sent_at=at,
+            )
+            .on_conflict_do_nothing(index_elements=["store_id", "remote_order_id"])
+            .returning(ReviewReminder.id)
+        )
+        report.reminders_imported += 1 if inserted else 0
 
 
 def _template(
@@ -259,6 +395,9 @@ async def migrate_settings(
     else:
         report.notes.append("Discord notifications were switched off in the old store.")
 
+    await _import_topups(session, platform, actor, store, folder, report)
+    await _import_reminders(session, platform, actor, store, folder, report)
+
     # The last day the old system reported is not reported again.
     cache = _read(folder, "daily_report_cache.json")
     last = cache.get("last_reported_date")
@@ -296,6 +435,7 @@ async def migrate_settings(
             "module_settings": report.module_settings,
             "timezone": report.timezone,
             "last_reported": report.last_reported,
+            "reminders_imported": report.reminders_imported,
             "dry_run": dry_run,
         },
     )
@@ -320,6 +460,7 @@ def format_settings_report(r: SettingsReport) -> str:
         "Module settings: "
         + (", ".join(f"{k} = {v}" for k, v in r.module_settings.items()) or "none"),
         f"Last day already reported by the old system: {r.last_reported or 'none'}",
+        f"Orders already reminded by the old system: {r.reminders_imported}",
     ]
     lines += [f"Note: {n}" for n in r.notes]
     return "\n".join(lines)

@@ -63,7 +63,7 @@ async def test_modules_need_the_marketplace_capabilities(auth_client) -> None:
     url = f"/api/v1/stores/{store['id']}/modules/topups"
     modules = (await auth_client.get(f"/api/v1/stores/{store['id']}/modules")).json()
     assert _module(modules, "topups")["available"] is False
-    assert _module(modules, "topups")["missing_capabilities"] == ["orders"]
+    assert _module(modules, "topups")["missing_capabilities"] == ["chat", "orders"]
     assert (await auth_client.put(url, json={"enabled": True})).status_code == 409
 
     await _connect(auth_client, store["id"])

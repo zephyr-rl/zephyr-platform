@@ -51,6 +51,11 @@ export const icons = {
       <path d="M4 5h16v11H8l-4 4z" />
     </Icon>
   ),
+  reviews: (
+    <Icon>
+      <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
+    </Icon>
+  ),
   reports: (
     <Icon>
       <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />

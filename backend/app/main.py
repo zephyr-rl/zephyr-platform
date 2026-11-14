@@ -16,6 +16,7 @@ from app.api.v1 import (
     messages,
     notifications,
     orders,
+    reminders,
     reports,
     stock,
     stores,
@@ -55,6 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(orders.router)
     api.include_router(messages.router)
     api.include_router(reports.router)
+    api.include_router(reminders.router)
     api.include_router(notifications.router)
     for router in platform.module_context.routers:
         api.include_router(router)

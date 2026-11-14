@@ -114,6 +114,9 @@ export interface JsonSchemaProperty {
   maxLength?: number;
   pattern?: string;
   items?: { type?: string };
+  enum?: string[];
+  /** "listings": edited per listing in Listings, not in the module form. */
+  ui?: string;
 }
 
 export interface ModuleSchema {
@@ -313,6 +316,7 @@ export type FulfilmentState =
   | "sent"
   | "done"
   | "manual"
+  | "awaiting_owner"
   | "needs_attention"
   | "cancelled"
   | "simulated";
@@ -484,4 +488,37 @@ export interface NotificationDeliveryRow {
   summary: string;
   attempts: number;
   last_error: string | null;
+}
+
+// ---- review reminders --------------------------------------------------------------------
+
+export interface ReminderCandidate {
+  order_id: number;
+  remote_id: string;
+  buyer: string;
+  title: string | null;
+  placed_at: string;
+  rating: number | null;
+}
+
+export interface ReminderRow {
+  id: number;
+  remote_order_id: string;
+  buyer_name: string | null;
+  state: "queued" | "sending" | "sent" | "skipped" | "failed";
+  note: string | null;
+  queued_by: string;
+  created_at: string;
+  sent_at: string | null;
+}
+
+export interface RemindersStatus {
+  enabled: boolean;
+  automatic: boolean;
+  shadow: boolean;
+  daily_cap: number;
+  sent_last_day: number;
+  queued: number;
+  review_filter: string;
+  history: ReminderRow[];
 }

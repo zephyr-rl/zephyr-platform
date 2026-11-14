@@ -16,6 +16,7 @@ import { MessagesPage } from "@/pages/Messages";
 import { NotificationsPage } from "@/pages/Notifications";
 import { OrdersPage } from "@/pages/Orders";
 import { OverviewPage } from "@/pages/Overview";
+import { RemindersPage } from "@/pages/Reminders";
 import { ReportsPage } from "@/pages/Reports";
 import { SettingsPage } from "@/pages/Settings";
 import { StockPage } from "@/pages/Stock";
@@ -75,6 +76,7 @@ const routeTree = rootRoute.addChildren([
     createRoute({ getParentRoute: () => appRoute, path: "/listings", component: ListingsPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/messages", component: MessagesPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/reports", component: ReportsPage }),
+    createRoute({ getParentRoute: () => appRoute, path: "/reminders", component: RemindersPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/notifications", component: NotificationsPage }),
   ]),
 ]);

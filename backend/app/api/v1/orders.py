@@ -25,7 +25,11 @@ from app.stores.service import get_store
 
 router = APIRouter(prefix="/stores/{store_id}/orders", tags=["orders"])
 
-ATTENTION = (FulfilmentState.needs_attention, FulfilmentState.awaiting_approval)
+ATTENTION = (
+    FulfilmentState.needs_attention,
+    FulfilmentState.awaiting_approval,
+    FulfilmentState.awaiting_owner,
+)
 WAITING = (
     FulfilmentState.awaiting_buyer,
     FulfilmentState.pending,
