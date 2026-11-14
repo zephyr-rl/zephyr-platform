@@ -50,6 +50,7 @@ ignore = ["S101", "B008", "RUF012"]
 "tests/**" = ["S", "ASYNC"]
 "migrations/**" = ["E501"]
 "app/legacy/**" = ["E501"]  # one-off migration tool: long report strings
+"app/modules/deliveries/messages.py" = ["E501", "RUF001"]  # buyer-facing text, kept as sent
 
 [tool.mypy]
 python_version = "3.12"

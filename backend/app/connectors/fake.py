@@ -87,7 +87,9 @@ class FakeConnector:
     async def list_orders(self, since: datetime, states: set[OrderState]) -> list[RemoteOrder]:
         self._enter("list_orders", since, states)
         return [
-            o for o in self.market.orders.values() if o.created_at >= since and o.state in states
+            o
+            for o in self.market.orders.values()
+            if o.created_at >= since and (not states or o.state in states)
         ]
 
     async def get_order(self, remote_id: str) -> RemoteOrder:

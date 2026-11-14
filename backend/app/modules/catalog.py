@@ -7,11 +7,19 @@ on and off. Their behaviour (job handlers, subscriptions) is added in later stag
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.connectors.base import Capability
-from app.core.modules import ModuleContext, ModuleRegistry
+from app.core.modules import ModuleContext, ModuleRegistry, PeriodicTask
+from app.modules.deliveries.messages import (
+    DEFAULT_CANCELLATION,
+    DEFAULT_CLARIFICATION,
+    DEFAULT_CONFIRMATION_MULTI,
+    DEFAULT_CONFIRMATION_SINGLE,
+    DEFAULT_DELIVERY_MESSAGE,
+)
 
 
 class _Settings(BaseModel):
@@ -19,13 +27,51 @@ class _Settings(BaseModel):
 
 
 class DeliveriesSettings(_Settings):
-    auto_deliver: bool = Field(True, description="Deliver paid orders without manual action.")
+    auto_deliver: bool = Field(
+        True,
+        description="Turn off to hold every automatic listing for your approval (kill switch).",
+    )
     message_template: str = Field(
-        "Thank you for your purchase!\n\n{items}",
+        DEFAULT_DELIVERY_MESSAGE,
         min_length=1,
         max_length=4000,
-        description="Message sent to the buyer. {items} is replaced by the delivered items.",
+        description="Message with the credentials. {items} is replaced by the accounts.",
     )
+    item_label: str = Field(
+        "Account",
+        min_length=1,
+        max_length=40,
+        description='Name of each item, e.g. "Twitch Account".',
+    )
+    confirmation_single: str = Field(
+        DEFAULT_CONFIRMATION_SINGLE,
+        min_length=1,
+        max_length=4000,
+        description="Asked before delivering one account when the listing needs confirmation.",
+    )
+    confirmation_multi: str = Field(
+        DEFAULT_CONFIRMATION_MULTI,
+        min_length=1,
+        max_length=4000,
+        description="Same, for several accounts. {quantity} is replaced by the number.",
+    )
+    clarification: str = Field(
+        DEFAULT_CLARIFICATION,
+        min_length=1,
+        max_length=4000,
+        description="Sent once when the buyer's reply is not a clear CONFIRM or CANCEL.",
+    )
+    cancellation: str = Field(
+        DEFAULT_CANCELLATION,
+        min_length=1,
+        max_length=4000,
+        description="Sent after the order is cancelled at the buyer's request.",
+    )
+    reply_languages: list[str] = Field(
+        default_factory=lambda: ["en"],
+        description='Languages recognised in buyer replies: "en" (always) and "es".',
+    )
+    lookback_hours: int = Field(72, ge=1, le=720, description="How far back orders are read.")
 
 
 class RestockSettings(_Settings):
@@ -77,8 +123,27 @@ class DeclaredModule:
         return None
 
 
+class DeliveriesModule(DeclaredModule):
+    def register(self, ctx: ModuleContext) -> None:
+        # Imported here: the service imports this catalog for its settings.
+        from app.modules.deliveries import jobs as delivery_jobs
+
+        delivery_jobs.register(ctx)
+        ctx.periodic.append(
+            PeriodicTask("orders-poll", "orders.poll", timedelta(seconds=60), module_key=self.key)
+        )
+        ctx.periodic.append(
+            PeriodicTask(
+                "confirmation-replies",
+                "deliveries.check_replies",
+                timedelta(seconds=60),
+                module_key=self.key,
+            )
+        )
+
+
 V1_MODULES: tuple[DeclaredModule, ...] = (
-    DeclaredModule(
+    DeliveriesModule(
         "deliveries",
         "Deliveries",
         "Delivers stock to buyers when orders are paid.",

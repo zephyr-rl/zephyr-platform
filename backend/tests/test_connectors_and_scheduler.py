@@ -95,9 +95,9 @@ async def test_scheduler_enqueues_each_run_once_for_enabled_stores(
     await stores.set_module(session, platform, actor, on.id, "restock", enabled=True)
     await session.commit()
 
-    platform.module_context.periodic.append(
+    platform.module_context.periodic[:] = [
         PeriodicTask("restock-check", "restock.run", timedelta(minutes=10), module_key="restock")
-    )
+    ]
     now = utcnow()
     assert await enqueue_due(platform, now) == 1
     assert await enqueue_due(platform, now) == 0  # same time bucket: nothing new
