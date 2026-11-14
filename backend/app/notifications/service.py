@@ -468,11 +468,13 @@ def test_embed(channel: NotificationChannel) -> dict[str, Any]:
     }
 
 
-def rule_test_embed(rule: NotificationRule) -> dict[str, Any]:
-    embed = render.render(
-        render.Template.model_validate(rule.template), catalog.sample(rule.event_type)
-    )
+def rule_test_embed(rule: NotificationRule, store_name: str | None = None) -> dict[str, Any]:
+    values = catalog.sample(rule.event_type)
+    if store_name and "store" in values:
+        values["store"] = store_name
+    embed = render.render(render.Template.model_validate(rule.template), values)
     embed["title"] = f"[Test] {embed.get('title', rule.name)}"[: render.LIMITS["title"]]
+    embed["footer"] = {"text": "Test message with example values: not a real order."}
     return embed
 
 

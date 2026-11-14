@@ -17,6 +17,7 @@ from app.notifications.models import (
     NotificationDelivery,
     NotificationRule,
 )
+from app.stores.models import Store
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -352,11 +353,12 @@ async def test_rule(
     """Send the rule's message with sample values, marked [Test]."""
     rule = await _rule(session, rule_id)
     channel = await service.get_channel(session, rule.channel_id)
+    store = await session.get(Store, rule.store_id) if rule.store_id else None
     delivery = await service.send_now(
         session,
         platform,
         channel,
-        service.rule_test_embed(rule),
+        service.rule_test_embed(rule, store.name if store else None),
         event_type=rule.event_type,
         store_id=rule.store_id,
         rule_id=rule.id,
