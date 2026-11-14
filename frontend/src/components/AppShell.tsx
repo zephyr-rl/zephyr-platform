@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { meQuery, StoreProvider, useStores } from "@/lib/session";
+import { GlobalSearch } from "./GlobalSearch";
 import { icons } from "./icons";
 import { Button, cx, StatusDot } from "./ui";
 
@@ -173,6 +174,7 @@ export function AppShell() {
               {icons.menu}
             </button>
             <StoreSelector />
+            <GlobalSearch />
             <UserMenu />
           </header>
           <main className="flex flex-col gap-6 px-4 py-6 sm:px-8">

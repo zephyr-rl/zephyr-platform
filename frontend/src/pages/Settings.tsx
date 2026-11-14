@@ -335,13 +335,109 @@ function AuditCard() {
   );
 }
 
+// ---- account -----------------------------------------------------------------------------
+
+function PasswordCard() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [again, setAgain] = useState("");
+  const queryClient = useQueryClient();
+  const change = useMutation({
+    mutationFn: () => api<{ revoked: number }>("/auth/password", { method: "POST", body: { current_password: current, new_password: next } }),
+    onSuccess: async (r) => {
+      setCurrent("");
+      setNext("");
+      setAgain("");
+      await queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      toast.success("Password changed", { description: r.revoked ? `${r.revoked} other session(s) were signed out.` : undefined });
+    },
+  });
+  const mismatch = again.length > 0 && again !== next;
+  return (
+    <Card title="Your password">
+      <form
+        className="flex flex-wrap items-end gap-3 p-4"
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          if (!mismatch) change.mutate();
+        }}
+      >
+        <TextField label="Current password" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required className="w-64" />
+        <TextField label="New password" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} required minLength={12} hint="At least 12 characters." className="w-64" />
+        <TextField
+          label="New password again"
+          type="password"
+          autoComplete="new-password"
+          value={again}
+          onChange={(e) => setAgain(e.target.value)}
+          required
+          error={mismatch ? "The two new passwords are different." : undefined}
+          className="w-64"
+        />
+        <Button type="submit" variant="primary" busy={change.isPending} disabled={mismatch}>
+          Change password
+        </Button>
+        {change.error && (
+          <p role="alert" className="basis-full text-[13px] text-danger">
+            {(change.error as ApiError).message}
+          </p>
+        )}
+        <p className="basis-full text-[13px] text-muted">Every other signed-in device is signed out when the password changes.</p>
+      </form>
+    </Card>
+  );
+}
+
+// ---- backups -----------------------------------------------------------------------------
+
+interface Backups {
+  folder: string;
+  available: boolean;
+  stale: boolean;
+  files: { name: string; size: number; created_at: string }[];
+}
+
+function BackupsCard() {
+  const backups = useQuery({ queryKey: ["backups"], queryFn: () => api<Backups>("/backups") });
+  const b = backups.data;
+  const size = (n: number) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+  return (
+    <Card title="Backups">
+      <div className="flex flex-col gap-3 p-4">
+        <p className="text-[13px] text-muted">
+          A full copy of the database is saved every night and kept for 14 days. Copy them off the server too (for example to your PC) now and then.
+        </p>
+        {b && !b.available && <p className="text-[13px] text-muted">The backup folder is not visible from here ({b.folder}): this is normal outside the server.</p>}
+        {b?.available && b.stale && (
+          <p role="alert" className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">
+            No backup in the last 36 hours. Check the backup service on the server.
+          </p>
+        )}
+        {b?.available && b.files.length > 0 && (
+          <ul className="divide-y divide-line rounded-md border border-line text-[13px]">
+            {b.files.slice(0, 7).map((f) => (
+              <li key={f.name} className="flex items-center gap-3 px-3 py-2">
+                <span className="font-mono">{f.name}</span>
+                <span className="tabular ml-auto text-muted">{size(f.size)}</span>
+                <span className="text-muted">{fmt(f.created_at)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 export function SettingsPage() {
   return (
     <>
       <h1 className="text-[22px] font-semibold">Settings</h1>
       <StoresCard />
       <ConnectionsCard />
+      <PasswordCard />
       <SessionsCard />
+      <BackupsCard />
       <AuditCard />
     </>
   );

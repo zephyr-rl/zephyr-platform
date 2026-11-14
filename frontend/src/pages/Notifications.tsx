@@ -243,7 +243,7 @@ function ChannelRow({
           </div>
         )}
       </div>
-      <div className="flex gap-2">
+      <div className="flex w-full flex-wrap gap-2 sm:w-auto">
         <Button size="sm" busy={test.isPending} onClick={() => test.mutate()}>
           Send test
         </Button>
@@ -740,7 +740,7 @@ function RuleRow({
           {excluded ? ` · ${excluded} offer(s) excluded` : ""}
         </div>
       </div>
-      <div className="flex gap-2">
+      <div className="flex w-full flex-wrap gap-2 sm:w-auto">
         <Button size="sm" busy={test.isPending} onClick={() => test.mutate()}>
           Send test
         </Button>

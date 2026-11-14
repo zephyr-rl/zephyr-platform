@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ExtractionResult } from "@/components/stock/ExtractionResult";
@@ -58,7 +58,9 @@ function ExtractControl({ storeId, pool, onResult }: { storeId: number; pool: St
   );
 }
 
-function HistoryDialog({ storeId, item, onClose }: { storeId: number; item: StockItem | null; onClose: () => void }) {
+type HistoryTarget = Pick<StockItem, "id" | "login_hint"> & { note?: string | null };
+
+function HistoryDialog({ storeId, item, onClose }: { storeId: number; item: HistoryTarget | null; onClose: () => void }) {
   const history = useQuery({
     queryKey: ["stock", storeId, "history", item?.id],
     queryFn: () => api<ItemEvent[]>(`/stores/${storeId}/stock/items/${item?.id}/history`),
@@ -121,7 +123,10 @@ export function StockPoolPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [panel, setPanel] = useState<"none" | "import" | "extract">("none");
   const [result, setResult] = useState<ExtractionDetail | null>(null);
-  const [historyOf, setHistoryOf] = useState<StockItem | null>(null);
+  const search = useSearch({ from: "/app/stock/$poolId" });
+  const [historyOf, setHistoryOf] = useState<HistoryTarget | null>(
+    search.item ? { id: search.item, login_hint: search.hint ?? `Account #${search.item}` } : null,
+  );
   const [moveTarget, setMoveTarget] = useState("");
 
   const pools = useQuery({

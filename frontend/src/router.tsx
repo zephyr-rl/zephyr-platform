@@ -70,9 +70,20 @@ const routeTree = rootRoute.addChildren([
     createRoute({ getParentRoute: () => appRoute, path: "/", component: OverviewPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/automation", component: AutomationPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/settings", component: SettingsPage }),
-    createRoute({ getParentRoute: () => appRoute, path: "/orders", component: OrdersPage }),
+    createRoute({
+      getParentRoute: () => appRoute,
+      path: "/orders",
+      component: OrdersPage,
+      validateSearch: (s: Record<string, unknown>): { order?: number } => (Number(s.order) > 0 ? { order: Number(s.order) } : {}),
+    }),
     createRoute({ getParentRoute: () => appRoute, path: "/stock", component: StockPage }),
-    createRoute({ getParentRoute: () => appRoute, path: "/stock/$poolId", component: StockPoolPage }),
+    createRoute({
+      getParentRoute: () => appRoute,
+      path: "/stock/$poolId",
+      component: StockPoolPage,
+      validateSearch: (s: Record<string, unknown>): { item?: number; hint?: string } =>
+        Number(s.item) > 0 ? { item: Number(s.item), hint: typeof s.hint === "string" ? s.hint : undefined } : {},
+    }),
     createRoute({ getParentRoute: () => appRoute, path: "/listings", component: ListingsPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/messages", component: MessagesPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/reports", component: ReportsPage }),

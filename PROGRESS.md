@@ -3,13 +3,13 @@
 Read `SPEC.md` first. This file says where we are and what comes next.
 
 ## Current stage
-**Stage 9 — Panel screens, desktop and mobile** (next). Stage 7 waits for one check by the owner:
+**Stage 10 — Shadow mode on the VPS** (next; needs the VPS: prepared up to that point). Stage 7 waits for one check by the owner:
 a test message on a Discord test channel (acceptance criterion of Stage 7).
 
 ## Next
 1. Owner: create a test channel in Discord, add its webhook in Notifications and press
    "Send test" (and "Send test" on a rule) to confirm the messages arrive.
-2. Stage 9: panel screens on the design, desktop and mobile walkthrough.
+2. Stage 10: install on the VPS in shadow mode next to the old system (see docs/DEPLOY.md).
 
 ## Decisions
 - 2026-11-14: **Accounts in stock that also appear in the old extraction history**
@@ -201,6 +201,24 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     listing are shown as a count with a pointer to Listings.
   - Tests: 268 backend (26 new), 7 frontend. Browser walkthrough (top-up in Needs you, listing
     switch, Automation, reminders queued and sent).
+
+- 2026-11-14: **Stage 9 — Panel screens, desktop and mobile.**
+  - Top bar: global search (orders by id or buyer; stock accounts only by their exact login,
+    also when pasted as login:password, since logins are stored as fingerprints). Enter or click
+    opens the order, or the account's history in its pool (deep links `/orders?order=` and
+    `/stock/<pool>?item=`).
+  - Overview: today's revenue, orders, accounts delivered and orders that need you; a "To do"
+    list (orders that need you, buyers waiting, low pools, failed jobs); recent activity of the
+    store (from the audit log).
+  - Settings: change password (signs out every other session), backups (the nightly dumps,
+    with an alert when the newest is older than 36 hours; the folder is mounted read-only into
+    the API container).
+  - Phones: every page checked at 390 px wide, no horizontal scrolling; row actions wrap under
+    the text.
+  - Not done (left for the owner to decide): an "All stores" choice in the store selector (each
+    page works per store; Notifications is already for all stores), and optional two-factor
+    sign-in (TOTP).
+  - Tests: 272 backend (4 new), 7 frontend; desktop and mobile walkthrough.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

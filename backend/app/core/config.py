@@ -41,6 +41,8 @@ class Settings(BaseSettings):
 
     # Serve the built panel (frontend/dist) from the API process when set.
     static_dir: str | None = None
+    # Where the nightly database dumps are (mounted read-only into the API to show them).
+    backup_dir: str = "/backups"
 
     log_level: str = "INFO"
 

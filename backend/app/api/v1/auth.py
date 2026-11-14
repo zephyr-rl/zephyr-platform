@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.deps import AuthDep, PlatformDep, SessionDep, client_ip
+from app.core import audit
 from app.identity import service as identity
 from app.identity.models import User, UserSession
 
@@ -42,6 +43,11 @@ class SessionOut(BaseModel):
 
 class RevokedOut(BaseModel):
     revoked: int
+
+
+class PasswordIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=512)
+    new_password: str = Field(min_length=1, max_length=512)
 
 
 def _me(auth_user: UserOut, user_session: UserSession) -> MeOut:
@@ -139,6 +145,31 @@ async def revoke_session(session_id: int, auth: AuthDep, session: SessionDep) ->
 async def revoke_other_sessions(auth: AuthDep, session: SessionDep) -> RevokedOut:
     count = await identity.revoke_sessions(
         session, auth.actor, user_id=auth.user.id, except_id=auth.session.id
+    )
+    await session.commit()
+    return RevokedOut(revoked=count)
+
+
+@router.post("/password", response_model=RevokedOut)
+async def change_password(body: PasswordIn, auth: AuthDep, session: SessionDep) -> RevokedOut:
+    """Change the password; every other session is signed out."""
+    user = await session.get(User, auth.user.id)
+    assert user is not None
+    if not identity.verify_password(user.password_hash, body.current_password):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "The current password is wrong.")
+    if body.new_password == body.current_password:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "The new password must be different."
+        )
+    try:
+        user.password_hash = identity.hash_password(body.new_password)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    audit.record(
+        session, auth.actor, "user.password_changed", entity_type="user", entity_id=user.id
+    )
+    count = await identity.revoke_sessions(
+        session, auth.actor, user_id=user.id, except_id=auth.session.id
     )
     await session.commit()
     return RevokedOut(revoked=count)

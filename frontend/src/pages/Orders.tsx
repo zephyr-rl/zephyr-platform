@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useSearch } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge, Button, Card, ConfirmDialog, EmptyState, Modal, TextField } from "@/components/ui";
 import { api, type FulfilmentState, type OrderDetail, type OrderRow } from "@/lib/api";
@@ -130,7 +131,11 @@ export function OrdersPage() {
   const { store } = useStores();
   const storeId = store?.id;
   const [show, setShow] = useState<(typeof FILTERS)[number]["key"]>("attention");
-  const [open, setOpen] = useState<number | null>(null);
+  const search = useSearch({ from: "/app/orders" });
+  const [open, setOpen] = useState<number | null>(search.order ?? null);
+  useEffect(() => {
+    if (search.order) setOpen(search.order);
+  }, [search.order]);
   const orders = useQuery({
     queryKey: ["orders", storeId, show],
     queryFn: () => api<OrderRow[]>(`/stores/${storeId}/orders?show=${show}`),
