@@ -6,9 +6,7 @@ Read `SPEC.md` first. This file says where we are and what comes next.
 **Stage 5 — Deliveries** (next).
 
 ## Next
-1. Owner: run `python -m app.cli eldorado-record --out tests/fixtures/eldorado/recorded` once
-   (read-only, redacted) so the fixtures can be checked against real responses.
-2. Stage 5: deliveries module — orders table, fulfilment state machine, reservations,
+1. Stage 5: deliveries module — orders table, fulfilment state machine, reservations,
    auto / assisted / message-only delivery, Twitch confirmation, with the I1/I2/I4 concurrency
    tests. Still in shadow mode.
 
@@ -73,7 +71,13 @@ Read `SPEC.md` first. This file says where we are and what comes next.
   - `open_connector()` applies shadow mode at run time: writes become `shadow.<action>` audit
     entries and never reach the marketplace.
   - Panel: Listings screen (read offers, edit delivery per offer), Eldorado credentials form.
-  - No call was made to the real Eldorado account (no credentials in this environment).
+  - 2026-11-14: checked against a read-only, redacted recording of the live API for the three
+    stores (the owner ran `_tests_claude/eldorado_record.py`; GET requests only). Fixed from it:
+    order lists are paged with a cursor (the old code thought one page of 50 was all), order
+    lookup by id is not available to the seller API (403) so orders are searched in the list,
+    reviews are nested in `reviews.results[].orderReview`, chat text comes in a `content`
+    array, and the `Buyer_Does_Not_Need_It_Anymore` cancel reason exists. All recorded orders
+    (102), offers (51), reviews (100) and messages (10) parse with no unknown states.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

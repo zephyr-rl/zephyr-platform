@@ -1,57 +1,197 @@
 {
+  "cursor": null,
+  "pageDirection": "Next",
+  "previousPageCursor": null,
+  "nextPageCursor": null,
+  "pageSize": 50,
   "results": [
     {
       "id": "order-paid-item",
       "offerId": "item-offer-1",
-      "state": {"state": "Paid"},
+      "state": {
+        "state": "Paid",
+        "createdDate": "2026-11-13T21:40:00Z"
+      },
       "createdDate": "2026-11-13T21:40:00Z",
       "purchaseQuantity": 2,
-      "totalPrice": {"amount": 9.98, "currency": "USD"},
+      "totalPrice": {
+        "amount": 9.98,
+        "currency": "USD"
+      },
       "buyerUsername": "buyer_one",
       "talkJsConversationId": "conv-paid-item",
       "orderOfferDetails": {
         "offerTitle": "Twitch drops linked to your account",
         "gameCategoryTitle": "Rocket League Items",
-        "category": "CustomItem"
-      }
+        "category": "CustomItem",
+        "orderPricing": {
+          "quantity": 1,
+          "minQuantity": 1,
+          "unitSystem": "Unit1",
+          "pricePerUnit": {
+            "amount": 9.98,
+            "currency": "USD"
+          },
+          "discountCsv": null
+        },
+        "guaranteedDeliveryTime": "Instant"
+      },
+      "stateLogs": [
+        {
+          "state": "Initialized",
+          "createdDate": "2026-11-13T21:40:00Z"
+        }
+      ],
+      "sellerId": "seller-123",
+      "buyerId": "buyer-item",
+      "latestDispute": null,
+      "cancelation": null,
+      "review": null
     },
     {
       "id": "order-delivered-account",
       "offerId": "acc-offer-1",
-      "state": {"state": "Delivered"},
+      "state": {
+        "state": "Delivered",
+        "createdDate": "2026-11-13T18:05:00Z"
+      },
       "createdDate": "2026-11-13T18:05:00Z",
       "purchaseQuantity": 1,
-      "totalPrice": {"amount": 4.99, "currency": "USD"},
+      "totalPrice": {
+        "amount": 4.99,
+        "currency": "USD"
+      },
       "buyerUsername": "buyer_two",
       "talkJsConversationId": "conv-delivered",
       "orderOfferDetails": {
         "offerTitle": "RLCS x6 drops account",
         "gameCategoryTitle": "Rocket League Accounts",
         "category": "Account",
-        "tradeEnvironmentProperties": [{"name": "Device", "value": "PC"}]
-      }
+        "tradeEnvironmentProperties": [
+          {
+            "name": "Device",
+            "value": "PC"
+          }
+        ],
+        "orderPricing": {
+          "quantity": 1,
+          "minQuantity": 1,
+          "unitSystem": "Unit1",
+          "pricePerUnit": {
+            "amount": 4.99,
+            "currency": "USD"
+          },
+          "discountCsv": null
+        },
+        "guaranteedDeliveryTime": "Instant"
+      },
+      "stateLogs": [
+        {
+          "state": "Initialized",
+          "createdDate": "2026-11-13T18:05:00Z"
+        }
+      ],
+      "sellerId": "seller-123",
+      "buyerId": "buyer-ount",
+      "latestDispute": null,
+      "cancelation": null,
+      "review": null
     },
     {
       "id": "order-received",
       "offerId": "acc-offer-1",
-      "state": {"state": "Received"},
+      "state": {
+        "state": "Received",
+        "createdDate": "2026-11-12T10:00:00Z"
+      },
       "createdDate": "2026-11-12T10:00:00Z",
       "purchaseQuantity": 1,
-      "totalPrice": {"amount": 4.99, "currency": "USD"},
+      "totalPrice": {
+        "amount": 4.99,
+        "currency": "USD"
+      },
       "buyerUsername": "buyer_three",
       "talkJsConversationId": "conv-received",
-      "orderOfferDetails": {"offerTitle": "RLCS x6 drops account", "category": "Account"}
+      "orderOfferDetails": {
+        "offerTitle": "RLCS x6 drops account",
+        "category": "Account",
+        "orderPricing": {
+          "quantity": 1,
+          "minQuantity": 1,
+          "unitSystem": "Unit1",
+          "pricePerUnit": {
+            "amount": 4.99,
+            "currency": "USD"
+          },
+          "discountCsv": null
+        },
+        "guaranteedDeliveryTime": "Instant"
+      },
+      "stateLogs": [
+        {
+          "state": "Initialized",
+          "createdDate": "2026-11-12T10:00:00Z"
+        }
+      ],
+      "sellerId": "seller-123",
+      "buyerId": "buyer-ived",
+      "latestDispute": null,
+      "cancelation": null,
+      "review": {
+        "reviewRating": "Positive",
+        "reviewTags": [],
+        "feedbackRating": "Positive",
+        "feedbackTags": [],
+        "reviewMessage": "",
+        "isReviewMessageVisible": true,
+        "wasInitialRatingPositive": true
+      }
     },
     {
       "id": "order-canceled",
       "offerId": "item-offer-1",
-      "state": {"state": "Canceled"},
+      "state": {
+        "state": "Canceled",
+        "createdDate": "2026-11-11T09:00:00Z"
+      },
       "createdDate": "2026-11-11T09:00:00Z",
       "purchaseQuantity": 1,
-      "totalPrice": {"amount": 4.99, "currency": "USD"},
+      "totalPrice": {
+        "amount": 4.99,
+        "currency": "USD"
+      },
       "buyerUsername": "buyer_four",
-      "orderOfferDetails": {"offerTitle": "Twitch drops linked to your account", "category": "CustomItem"}
+      "orderOfferDetails": {
+        "offerTitle": "Twitch drops linked to your account",
+        "category": "CustomItem",
+        "orderPricing": {
+          "quantity": 1,
+          "minQuantity": 1,
+          "unitSystem": "Unit1",
+          "pricePerUnit": {
+            "amount": 4.99,
+            "currency": "USD"
+          },
+          "discountCsv": null
+        },
+        "guaranteedDeliveryTime": "Instant"
+      },
+      "stateLogs": [
+        {
+          "state": "Initialized",
+          "createdDate": "2026-11-11T09:00:00Z"
+        }
+      ],
+      "talkJsConversationId": null,
+      "sellerId": "seller-123",
+      "buyerId": "buyer-eled",
+      "latestDispute": null,
+      "cancelation": {
+        "canceledByUserRole": "Seller",
+        "reason": "Buyer_Does_Not_Need_It_Anymore",
+        "message": ""
+      },
+      "review": null
     }
-  ],
-  "recordCount": 4
+  ]
 }

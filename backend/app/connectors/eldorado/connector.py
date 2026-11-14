@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
 
@@ -39,6 +40,7 @@ INFO = ConnectorInfo(
 
 PAGE_SIZE = 50  # the largest page the order endpoints return
 MAX_PAGES = 20
+ORDER_PAGES = 10  # up to 500 recent orders per state
 DELIVERED_OR_LATER = {OrderState.delivered, OrderState.completed}
 
 
@@ -96,42 +98,48 @@ class EldoradoConnector:
 
     # ---- orders ----------------------------------------------------------------------
 
-    async def _orders_page(self, **params: Any) -> list[RemoteOrder]:
-        body = await self._http.request(
-            "GET", "api/orders/me/seller/orders", params={"pageSize": PAGE_SIZE, **params}
-        )
-        return [
-            parse.parse_order(o) for o in parse.results(body) if parse.first(o, "id", "orderId")
-        ]
+    async def _orders(
+        self, *, since: datetime | None = None, max_pages: int = ORDER_PAGES, **params: Any
+    ) -> AsyncIterator[RemoteOrder]:
+        """Seller orders, newest first, following the page cursor."""
+        cursor: str | None = None
+        for _ in range(max_pages):
+            body = await self._http.request(
+                "GET",
+                "api/orders/me/seller/orders",
+                params={"pageSize": PAGE_SIZE, "pageDirection": "Next", "cursor": cursor, **params},
+            )
+            page = [
+                parse.parse_order(o) for o in parse.results(body) if parse.first(o, "id", "orderId")
+            ]
+            for order in page:
+                yield order
+            cursor = parse.next_cursor(body)
+            if not cursor or not page or (since and min(o.created_at for o in page) < since):
+                return
 
     async def list_orders(self, since: datetime, states: set[OrderState]) -> list[RemoteOrder]:
-        """Recent orders in the given states. The order search returns one page of at most 50
-        orders and ignores page numbers, so each state is queried separately."""
+        """Orders created since ``since`` in the given states (all states when empty)."""
         names = sorted({n for state in states for n in parse.REMOTE_STATE_FILTER.get(state, [])})
         filters: list[str | None] = list(names) if names else [None]
         found: dict[str, RemoteOrder] = {}
         for remote_state in filters:
-            for order in await self._orders_page(orderState=remote_state):
+            async for order in self._orders(since=since, orderState=remote_state):
                 if order.created_at >= since and (not states or order.state in states):
                     found.setdefault(order.remote_id, order)
         return sorted(found.values(), key=lambda o: o.created_at)
 
     async def get_order(self, remote_id: str) -> RemoteOrder:
+        """One order by id. The seller API has no "get order" endpoint (it answers 403), so the
+        order list is searched; only an exact id match is accepted, never "the first result"."""
         remote_id = remote_id.strip()
-        for order in await self._orders_page(query=remote_id):
-            if order.remote_id == remote_id:  # only an exact match: never "the first result"
+        async for order in self._orders(max_pages=1, query=remote_id):
+            if order.remote_id == remote_id:
                 return order
-        try:
-            body = await self._http.request("GET", f"api/orders/me/{remote_id}")
-        except ConnectorError as exc:
-            if exc.status == 404:
-                raise ConnectorError(
-                    f"Order {remote_id} not found", retryable=False, status=404
-                ) from None
-            raise
-        if not isinstance(body, dict) or parse.first(body, "id", "orderId") != remote_id:
-            raise ConnectorError(f"Order {remote_id} not found", retryable=False, status=404)
-        return parse.parse_order(body)
+        async for order in self._orders():
+            if order.remote_id == remote_id:
+                return order
+        raise ConnectorError(f"Order {remote_id} not found", retryable=False, status=404)
 
     async def mark_delivered(self, remote_id: str, payload: DeliveryPayload) -> RemoteResult:
         """Marks the order delivered. Eldorado takes no body here: the items reach the buyer
@@ -288,8 +296,12 @@ class EldoradoConnector:
 
     # ---- chat --------------------------------------------------------------------------
 
+    async def _chat_user(self) -> str:
+        _, _, user_id = await self._http.chat_session()
+        return user_id or await self._seller_user_id()
+
     async def chat_list_messages(self, conversation_id: str, since: datetime) -> list[ChatMessage]:
-        _, _, seller_id = await self._http.chat_session()
+        seller_id = await self._chat_user()
         body = await self._http.talkjs(
             "GET", f"conversations/{conversation_id}/messages", params={"limit": 30}
         )
@@ -297,7 +309,7 @@ class EldoradoConnector:
         return sorted((m for m in messages if m.sent_at >= since), key=lambda m: m.sent_at)
 
     async def chat_send(self, conversation_id: str, text: str) -> RemoteResult:
-        _, _, seller_id = await self._http.chat_session()
+        seller_id = await self._chat_user()
         # Same body the old seller portal sent in production.
         await self._http.talkjs(
             "POST",
@@ -322,7 +334,7 @@ class EldoradoConnector:
                 r for r in (parse.parse_review(x) for x in parse.results(body)) if r is not None
             ]
             reviews.extend(r for r in page if r.created_at >= since)
-            cursor = parse.first(body, "nextCursor", "cursor") if isinstance(body, dict) else None
+            cursor = parse.next_cursor(body)
             if not cursor or not page or min(r.created_at for r in page) < since:
                 break
         return reviews

@@ -48,7 +48,9 @@ OFFER_STATES = {
     "paused": OfferState.paused,
     "closed": OfferState.closed,
 }
-CANCEL_REASONS = frozenset({"Buyer_Does_Not_Meet_Criteria_For_Order", "Out_Of_Stock"})
+CANCEL_REASONS = frozenset(
+    {"Buyer_Does_Not_Meet_Criteria_For_Order", "Out_Of_Stock", "Buyer_Does_Not_Need_It_Anymore"}
+)
 
 
 def first(data: dict[str, Any], *keys: str) -> Any:
@@ -150,7 +152,19 @@ def results(body: Any) -> list[dict[str, Any]]:
             value = body.get(key)
             if isinstance(value, list):
                 return [x for x in value if isinstance(x, dict)]
+        if isinstance(body.get("reviews"), dict):  # {"userOrderInfo": …, "reviews": {"results": …}}
+            return results(body["reviews"])
     return []
+
+
+def next_cursor(body: Any) -> str | None:
+    """Cursor of the next page (orders and reviews are paged with cursors)."""
+    if not isinstance(body, dict):
+        return None
+    if isinstance(body.get("reviews"), dict):
+        body = body["reviews"]
+    value = first(body, "nextPageCursor", "nextCursor")
+    return str(value) if value else None
 
 
 def parse_vault_entry(data: dict[str, Any]) -> VaultEntry:
@@ -191,14 +205,28 @@ def vault_payload(entry: VaultEntry) -> dict[str, Any]:
     }
 
 
+def _flatten(content: Any) -> str:
+    """TalkJS rich content: [{"type": "text", "children": ["Hi", {"type": "bold", ...}]}]."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(_flatten(part) for part in content)
+    if isinstance(content, dict):
+        if isinstance(content.get("text"), str):
+            return str(content["text"])
+        return _flatten(content.get("children", []))
+    return ""
+
+
 def parse_message(data: dict[str, Any], conversation_id: str, seller_id: str) -> ChatMessage:
     sender = first(data, "senderId", "sender")
+    text = data.get("text") if isinstance(data.get("text"), str) else _flatten(data.get("content"))
     return ChatMessage(
         remote_id=str(data.get("id")),
         conversation_id=conversation_id,
         author_id=str(sender) if sender else None,
         from_seller=bool(sender) and str(sender) == seller_id,
-        text=str(data.get("text") or data.get("content") or ""),
+        text=text or "",
         sent_at=parse_time(first(data, "createdAt", "timestamp")),
     )
 
@@ -218,6 +246,16 @@ def review_rating(data: dict[str, Any]) -> int | None:
 
 
 def parse_review(data: dict[str, Any]) -> Review | None:
+    if isinstance(data.get("orderReview"), dict):
+        # Reviews endpoint: {"orderReview": {"id": <order id>, "date", "review": {…}}, "buyer"}
+        outer = data["orderReview"]
+        inner = outer.get("review") if isinstance(outer.get("review"), dict) else {}
+        data = {
+            **inner,
+            "orderId": outer.get("id"),
+            "createdDate": outer.get("date"),
+            "reviewText": inner.get("reviewMessage"),
+        }
     rating = review_rating(data)
     if rating is None:
         return None
@@ -226,6 +264,6 @@ def parse_review(data: dict[str, Any]) -> Review | None:
         remote_id=str(first(data, "id", "reviewId") or order_id or ""),
         order_id=str(order_id) if order_id else None,
         rating=rating,
-        text=first(data, "reviewText", "feedbackText", "comment", "text"),
+        text=first(data, "reviewText", "reviewMessage", "feedbackText", "comment", "text"),
         created_at=parse_time(first(data, "createdDate", "createdAt", "date")),
     )

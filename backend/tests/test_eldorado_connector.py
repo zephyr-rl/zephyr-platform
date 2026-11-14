@@ -125,10 +125,13 @@ def test_unknown_states_are_never_mistaken_for_known_ones() -> None:
 
 async def test_get_order_only_returns_an_exact_match(eldorado, server) -> None:
     assert (await eldorado.get_order("order-delivered-account")).state is OrderState.delivered
+    assert (await eldorado.get_order("order-canceled")).state is OrderState.cancelled
     # The search is fuzzy and would return another order: the connector must not accept it.
     with pytest.raises(ConnectorError) as err:
         await eldorado.get_order("missing-order")
     assert err.value.status == 404 and not err.value.retryable
+    # The seller API has no get-order endpoint (403): it is never called.
+    assert [r for r in server.requests if r.url.path.startswith("/api/orders/me/order")] == []
 
 
 async def test_deliver_sends_an_empty_body(eldorado, server) -> None:
@@ -162,6 +165,12 @@ async def test_deliver_of_a_cancelled_order_is_not_retryable(eldorado, server) -
     with pytest.raises(ConnectorError) as err:
         await eldorado.mark_delivered("order-canceled", DeliveryPayload(message="m"))
     assert not err.value.retryable and "Canceled" in str(err.value)
+
+
+async def test_cancelled_by_us_reason_is_accepted(eldorado, server) -> None:
+    await eldorado.cancel_order("order-paid-item", "Buyer_Does_Not_Need_It_Anymore")
+    [post] = server.calls("POST", "/api/orders/me/order-paid-item/cancel")
+    assert json.loads(post.content) == {"reason": "Buyer_Does_Not_Need_It_Anymore"}
 
 
 async def test_cancel_uses_a_valid_reason(eldorado, server) -> None:
@@ -297,6 +306,7 @@ async def test_vault_add_conflict_checks_whether_it_was_stored(eldorado, server)
 async def test_chat_messages_and_sending(eldorado, server) -> None:
     messages = await eldorado.chat_list_messages("conv-1", LONG_AGO)
     assert [(m.remote_id, m.from_seller) for m in messages] == [("msg-1", False), ("msg-2", True)]
+    assert messages[0].text == "Hi, the account does not work"  # rich content flattened
     await eldorado.chat_send("conv-1", "Here is your account")
     [post] = server.calls("POST", f"/v1/{CHAT_APP}/conversations/conv-1/messages")
     assert json.loads(post.content) == {"text": "Here is your account", "sender": CHAT_SELLER}
@@ -340,7 +350,7 @@ async def test_shadow_mode_never_sends_a_write_to_eldorado(eldorado, server) -> 
     ]
     assert writes == []
     assert len(decisions) == 6
-    assert server.orders[0]["state"] == {"state": "Paid"}
+    assert server.orders[0]["state"]["state"] == "Paid"
 
 
 def test_recorder_redacts_secrets_consistently() -> None:

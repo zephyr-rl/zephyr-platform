@@ -1,13 +1,19 @@
 {
+  "pageIndex": 1,
+  "totalPages": 1,
+  "recordCount": 1,
+  "pageSize": 50,
   "results": [
     {
       "id": "item-offer-1",
       "offerTitle": "Twitch drops linked to your account",
       "offerState": "Active",
-      "pricePerUnit": {"amount": 4.99, "currency": "USD"},
+      "pricePerUnit": {
+        "amount": 4.99,
+        "currency": "USD"
+      },
       "category": "CustomItem",
       "gameCategoryTitle": "Rocket League Items"
     }
-  ],
-  "recordCount": 1
+  ]
 }

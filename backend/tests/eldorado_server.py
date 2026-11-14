@@ -36,6 +36,7 @@ class EldoradoServer:
         self.orders = fixture("seller_orders")["results"]
         self.vault = fixture("secret_details")
         self.tokens_issued = 0
+        self.order_page_size = 2  # small pages, so tests follow the cursor like the real API
 
     def script(self, method: str, path: str, *responses: httpx.Response) -> None:
         self.scripted[(method, path)].extend(responses)

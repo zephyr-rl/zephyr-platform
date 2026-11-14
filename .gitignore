@@ -16,3 +16,4 @@ dist/
 .env
 *.log
 backups/
+backend/tests/fixtures/eldorado/recorded/

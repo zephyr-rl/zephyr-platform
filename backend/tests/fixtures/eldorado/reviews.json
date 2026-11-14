@@ -1,9 +1,94 @@
 {
-  "results": [
-    {"id": "review-1", "orderId": "order-received", "reviewRating": "Positive", "reviewText": "Fast delivery", "createdDate": "2026-11-13T12:00:00Z"},
-    {"id": "review-2", "orderId": "order-old", "feedbackRating": "Negative", "createdDate": "2026-11-12T12:00:00Z"},
-    {"id": "review-3", "orderId": "order-x", "rating": 4, "comment": "ok", "createdDate": "2026-11-01T12:00:00Z"},
-    {"id": "review-4", "orderId": "order-y", "createdDate": "2026-11-13T12:00:00Z"}
-  ],
-  "nextCursor": null
+  "userOrderInfo": {
+    "userId": "seller-123",
+    "positiveCount": 1233,
+    "negativeCount": 2,
+    "ratingCount": 1235,
+    "feedbackScore": 99.8
+  },
+  "reviews": {
+    "cursor": null,
+    "pageDirection": "Next",
+    "previousPageCursor": null,
+    "nextPageCursor": null,
+    "pageSize": 50,
+    "results": [
+      {
+        "orderReview": {
+          "category": "Account",
+          "id": "order-received",
+          "gameCategoryTitle": "Accounts",
+          "date": "2026-11-13T12:00:00Z",
+          "review": {
+            "reviewRating": "Positive",
+            "reviewTags": [],
+            "feedbackRating": "Positive",
+            "feedbackTags": [],
+            "reviewMessage": "Fast delivery",
+            "isReviewMessageVisible": true,
+            "wasInitialRatingPositive": true
+          }
+        },
+        "buyer": {
+          "maskedUsername": "b***1",
+          "picture": null,
+          "createdDate": "2024-01-01T00:00:00Z",
+          "isVerifiedSeller": false
+        }
+      },
+      {
+        "orderReview": {
+          "category": "CustomItem",
+          "id": "order-old",
+          "gameCategoryTitle": "Items",
+          "date": "2026-11-12T12:00:00Z",
+          "review": {
+            "reviewRating": "Negative",
+            "feedbackRating": "Negative",
+            "reviewMessage": "",
+            "isReviewMessageVisible": true
+          }
+        },
+        "buyer": {
+          "maskedUsername": "b***2",
+          "picture": null,
+          "createdDate": "2024-01-01T00:00:00Z",
+          "isVerifiedSeller": false
+        }
+      },
+      {
+        "orderReview": {
+          "category": "Account",
+          "id": "order-x",
+          "gameCategoryTitle": "Accounts",
+          "date": "2026-11-01T12:00:00Z",
+          "review": {
+            "reviewRating": "Positive",
+            "reviewMessage": "ok"
+          }
+        },
+        "buyer": {
+          "maskedUsername": "b***3",
+          "picture": null,
+          "createdDate": "2024-01-01T00:00:00Z",
+          "isVerifiedSeller": false
+        }
+      },
+      {
+        "orderReview": {
+          "category": "Account",
+          "id": "order-y",
+          "gameCategoryTitle": "Accounts",
+          "date": "2026-11-13T12:00:00Z",
+          "review": {}
+        },
+        "buyer": {
+          "maskedUsername": "b***4",
+          "picture": null,
+          "createdDate": "2024-01-01T00:00:00Z",
+          "isVerifiedSeller": false
+        }
+      }
+    ]
+  }
 }

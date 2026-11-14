@@ -1,1 +1,8 @@
-{"id": "seller-123", "username": "ZephyrStore", "isVerifiedSeller": true}
+{
+  "id": "seller-123",
+  "username": "ZephyrStore",
+  "isVerifiedSeller": true,
+  "isTalkJsUserCreated": true,
+  "isChatWritingAccessEnabled": true,
+  "suspension": null
+}
