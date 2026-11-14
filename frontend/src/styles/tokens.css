@@ -1,0 +1,55 @@
+/* Graphite design tokens. See DESIGN.md. */
+:root {
+  color-scheme: dark;
+
+  /* Color */
+  --bg: #111315;
+  --bg-sidebar: #15181b;
+  --surface: #181b1f;
+  --surface-raised: #1e2226;
+  --surface-hover: #22262b;
+  --border: #262a30;
+  --border-strong: #2e333a;
+  --text: #e6e8eb;
+  --text-muted: #9aa1ab;
+  --text-on-accent: #0b0d0f;
+  --accent: #4c8dff;
+  --success: #5fb98a;
+  --warning: #f0a35e;
+  --danger: #f07a6a;
+
+  /* Type */
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 15px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Space */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* Radius and elevation */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --shadow-raised: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  /* Layout */
+  --sidebar-width: 232px;
+  --control-height: 40px;
+  --touch-target: 44px;
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
