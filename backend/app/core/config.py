@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # Format "<key_id>:<base64>" or just "<base64>" (key id "k1"). Several keys separated by
     # commas: the first one encrypts, all of them decrypt (key rotation).
     secret_keys: SecretStr = Field(default=SecretStr(""))
+    # Separate 32-byte key (base64) for stock fingerprints (HMAC of the login). Unlike the
+    # encryption keys it must never change: duplicates are detected by comparing fingerprints.
+    fingerprint_key: SecretStr = Field(default=SecretStr(""))
 
     # Sessions
     session_cookie: str = "zp_session"

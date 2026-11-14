@@ -8,7 +8,7 @@ from app.connectors import fake
 from app.connectors.base import ConnectorRegistry
 from app.core import models  # noqa: F401  (every table must be mapped in every process)
 from app.core.config import Settings
-from app.core.crypto import SecretBox
+from app.core.crypto import Fingerprinter, SecretBox
 from app.core.db import Database
 from app.core.events import EventBus
 from app.core.jobs import JobRegistry
@@ -21,6 +21,7 @@ class Platform:
     settings: Settings
     db: Database
     secrets: SecretBox
+    fingerprints: Fingerprinter
     connectors: ConnectorRegistry
     modules: ModuleRegistry
     jobs: JobRegistry
@@ -43,6 +44,7 @@ def build_platform(settings: Settings) -> Platform:
         settings=settings,
         db=Database(settings),
         secrets=SecretBox(settings.secret_keys.get_secret_value()),
+        fingerprints=Fingerprinter(settings.fingerprint_key.get_secret_value()),
         connectors=build_connector_registry(),
         modules=build_module_registry(),
         jobs=JobRegistry(),

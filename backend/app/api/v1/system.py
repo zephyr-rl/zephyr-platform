@@ -100,7 +100,7 @@ class JobsSummary(BaseModel):
 async def jobs_summary(auth: AuthDep, session: SessionDep) -> JobsSummary:
     rows = await session.execute(select(Job.state, func.count()).group_by(Job.state))
     counts = {state.value: 0 for state in JobState}
-    counts.update({state.value: n for state, n in rows.tuples()})
+    counts.update({state.value: n for state, n in rows})
     dead = await session.scalars(
         select(Job).where(Job.state == JobState.dead).order_by(Job.id.desc()).limit(20)
     )

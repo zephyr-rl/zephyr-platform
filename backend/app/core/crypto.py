@@ -7,6 +7,8 @@ The first configured key encrypts; every configured key can decrypt, which allow
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import json
 import os
 from typing import Any
@@ -84,3 +86,28 @@ def mask(value: str, visible: int = 4) -> str:
     if len(value) <= visible * 2:
         return REDACTED
     return f"{REDACTED}{value[-visible:]}"
+
+
+class Fingerprinter:
+    """Keyed hash (HMAC-SHA256) used to compare secrets such as logins without storing them."""
+
+    def __init__(self, key_spec: str) -> None:
+        self._key = _decode_key(key_spec) if key_spec.strip() else None
+
+    @property
+    def configured(self) -> bool:
+        return self._key is not None
+
+    def __call__(self, value: str) -> str:
+        if self._key is None:
+            raise CryptoError("No fingerprint key configured (ZP_FINGERPRINT_KEY).")
+        return hmac.new(self._key, value.encode(), hashlib.sha256).hexdigest()
+
+
+def hint(value: str) -> str:
+    """Short recognisable form of a login for lists: ``ab••••yz``."""
+    value = value.strip()
+    if len(value) <= 4:
+        return value[:1] + "•••"
+    keep = 2 if len(value) < 10 else 3
+    return f"{value[:keep]}••••{value[-keep:]}"

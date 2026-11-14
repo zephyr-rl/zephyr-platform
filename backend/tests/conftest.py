@@ -56,6 +56,7 @@ def settings() -> Settings:
         env="test",
         database_url=TEST_DB_URL,
         secret_keys=SecretStr(generate_key()),
+        fingerprint_key=SecretStr(generate_key()),
         cookie_secure=False,
         log_level="WARNING",
     )
@@ -71,6 +72,12 @@ async def app_platform(settings: Settings) -> AsyncIterator[tuple[object, Platfo
         tables = ", ".join(
             f'"{t}"'
             for t in (
+                "stock_item_events",
+                "stock_item_secrets",
+                "stock_items",
+                "stock_extractions",
+                "stock_imports",
+                "stock_pools",
                 "audit_log",
                 "outbox_events",
                 "jobs",

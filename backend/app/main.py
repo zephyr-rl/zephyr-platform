@@ -10,7 +10,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.v1 import auth, stores, system
+from app.api.v1 import auth, stock, stores, system
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.core.platform import build_platform
@@ -40,6 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(system.router)
     api.include_router(auth.router)
     api.include_router(stores.router)
+    api.include_router(stock.router)
     for router in platform.module_context.routers:
         api.include_router(router)
     app.include_router(api)
