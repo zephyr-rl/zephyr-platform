@@ -82,6 +82,7 @@ services:
     environment:
       ZP_SITE_ADDRESS: ${ZP_SITE_ADDRESS:?set ZP_SITE_ADDRESS in .env}
       ZP_TLS_MODE: ${ZP_TLS_MODE:-auto}
+      ZP_DEFAULT_SNI: ${ZP_DEFAULT_SNI:-localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

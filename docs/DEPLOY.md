@@ -22,6 +22,7 @@ docker compose build
 docker compose run --rm --no-deps api python -m app.cli generate-key   # → ZP_SECRET_KEYS
 docker compose run --rm --no-deps api python -m app.cli generate-key   # → ZP_FINGERPRINT_KEY
 nano .env      # POSTGRES_PASSWORD, ZP_SECRET_KEYS, ZP_FINGERPRINT_KEY, ZP_SITE_ADDRESS, ZP_TLS_MODE
+               # (and ZP_DEFAULT_SNI=<server IP> when there is no domain)
 mkdir -p backups
 docker compose up -d
 docker compose run --rm api python -m app.cli create-owner --email you@example.com

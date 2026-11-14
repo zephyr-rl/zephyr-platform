@@ -1,5 +1,12 @@
 # ZP_SITE_ADDRESS: your domain (zephyrstore.site) or https://<server-ip>
 # ZP_TLS_MODE: "auto" (public certificate for a domain) or "internal" (self-signed, for an IP)
+# ZP_DEFAULT_SNI: the server IP when it is used without a domain. Browsers send no server name
+#   when they connect to an IP address, and without this Caddy would not know which certificate
+#   to answer with (the connection fails).
+
+{
+	default_sni {$ZP_DEFAULT_SNI:localhost}
+}
 
 (tls_auto) {
 }

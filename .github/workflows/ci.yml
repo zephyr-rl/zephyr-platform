@@ -74,6 +74,7 @@ jobs:
           ZP_FINGERPRINT_KEY=$(key)
           ZP_SITE_ADDRESS=https://127.0.0.1
           ZP_TLS_MODE=internal
+          ZP_DEFAULT_SNI=127.0.0.1
           EOF
           mkdir -p backups
           docker compose up -d --build
