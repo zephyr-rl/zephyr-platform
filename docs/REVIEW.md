@@ -75,6 +75,16 @@ Starting it needs the VPS and the owner. Prepared:
 - No Linux VPS yet: Stage 10 runs on the Windows Server 2022 remote desktop where the old bots
   run (16 GB RAM, 6 vCPU, 140 GB disk).
 
+## Windows Server kit (2026-11-15)
+
+- Built for the remote desktop instead of the Linux VPS: native install, no Docker (Docker
+  Desktop does not run on Windows Server). Details in docs/DEPLOY-WINDOWS.md.
+- Choices you may want to change: install folder `C:\ZephyrPlatform`, panel port 8600,
+  database port 5433, 2 workers, nightly backup at 04:17 server time, phone access through a
+  Cloudflare quick tunnel (same as the old system) instead of a fixed domain.
+- Verified for real on a Windows Server 2022 machine in CI (install, sign-in, backup, check,
+  reinstall, update, stop, start). Not yet run on your server.
+
 ## What I needed from you (answered)
 
 1. Run `send_discord_tests.py` on the PC and tell me if the messages look right (14 in total: one test per channel, and per store an example sale, buyer message and daily report).

@@ -145,13 +145,17 @@ jobs:
           Start-Sleep -Seconds 3
           if (Get-NetTCPConnection -LocalPort 8600 -State Listen -ErrorAction SilentlyContinue) { throw 'Still running after STOP.' }
           & C:\ZP\scripts\start.ps1 -Root C:\ZP
+      - name: Collect the logs
+        if: always()
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path windows-logs | Out-Null
+          Copy-Item C:\ZP\logs\* windows-logs -ErrorAction SilentlyContinue
+          Copy-Item "$env:TEMP\install-postgresql.log" windows-logs -ErrorAction SilentlyContinue
       - name: Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-kit-logs
-          path: |
-            C:\ZP\logs
-            ${{ runner.temp }}\install-postgresql.log
-            C:\Users\runneradmin\AppData\Local\Temp\install-postgresql.log
+          path: windows-logs
           if-no-files-found: ignore
