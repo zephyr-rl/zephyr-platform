@@ -10,6 +10,7 @@ import argparse
 import asyncio
 import getpass
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -132,6 +133,10 @@ def main(argv: list[str] | None = None) -> None:
     owner = sub.add_parser("create-owner", help="Create the owner account")
     owner.add_argument("--email", required=True)
     owner.add_argument("--name", default="Owner")
+    owner.add_argument(
+        "--password-env",
+        help="Read the password from this environment variable instead of asking (installers)",
+    )
     sub.add_parser("generate-key", help="Print a new secret key for ZP_SECRET_KEYS")
     legacy = sub.add_parser(
         "migrate-legacy", help="Import an old store's accounts.sqlite3 (read-only)"
@@ -205,9 +210,12 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "generate-key":
         print(generate_key())
         return
-    password = getpass.getpass("Password (12+ characters): ")
-    if password != getpass.getpass("Repeat password: "):
-        sys.exit("Passwords do not match.")
+    if args.password_env:
+        password = os.environ.get(args.password_env, "")
+    else:
+        password = getpass.getpass("Password (12+ characters): ")
+        if password != getpass.getpass("Repeat password: "):
+            sys.exit("Passwords do not match.")
     try:
         identity.hash_password(password)
     except ValueError as exc:

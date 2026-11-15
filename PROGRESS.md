@@ -253,6 +253,24 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
   - API: `GET /all/summary`, `GET /all/overview`.
   - The old system's SQLite database is opened read-only with its path quoted (Windows folders
     have spaces).
+- 2026-11-15: **Windows Server kit** (Stage 10 runs on the remote desktop, next to the old bots).
+  - `scripts/build_windows_kit.py` builds the kit: backend, built panel, `deploy/windows/`
+    scripts, docs/DEPLOY-WINDOWS.md. `INSTALL.bat` / `UPDATE.bat` (elevate themselves).
+  - Install into `C:\ZephyrPlatform`: uv + Python 3.12, PostgreSQL 16 (EDB installer,
+    unattended, service ZephyrPostgres, port 5433, localhost only), `.env` with generated keys
+    (never replaced; readable by Administrators and SYSTEM only), database and owner account,
+    scheduled tasks "Zephyr Platform" (supervisor at boot + every 5 minutes, one instance) and
+    "Zephyr Platform backup" (04:17, 14 days kept). Panel on `127.0.0.1:8600` only; the old
+    ports 5000/7000/8000 are untouched.
+  - `app/deploy/`: `supervisor.py` (runs migrations, then the API, 2 workers and the scheduler;
+    restarts with backoff; rotated logs; stops on `run\stop`), `backup.py` (pg_dump, prune),
+    `setup.py` (init-env, init-db, has-owner, check), `run.py` (zephyr.bat: CLI with the
+    install's settings), `legacy_snapshot.py` (SNAPSHOT_OLD.bat: read-only copy of
+    `C:\EldoradoBots\Eldorado API - *`; SQLite through its backup API; backup folders skipped).
+  - The worker and the scheduler also stop when `ZP_STOP_FILE` exists (no SIGTERM on Windows).
+  - `create-owner --password-env` for unattended installs.
+  - CI job `windows-kit` (windows-2022) builds the kit and runs INSTALL, sign-in, backup,
+    CHECK, a second INSTALL (keys unchanged), UPDATE, STOP and START for real.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

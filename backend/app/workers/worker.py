@@ -13,7 +13,7 @@ import signal
 import socket
 from datetime import timedelta
 
-from app.core import jobs
+from app.core import jobs, stopfile
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.core.platform import Platform, build_platform
@@ -73,9 +73,11 @@ async def main() -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         with contextlib.suppress(NotImplementedError):  # Windows
             loop.add_signal_handler(sig, worker.stop)
+    watcher = asyncio.create_task(stopfile.watch(settings.stop_file, worker.stop))
     try:
         await worker.run()
     finally:
+        watcher.cancel()
         await platform.db.dispose()
 
 

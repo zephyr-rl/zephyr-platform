@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     static_dir: str | None = None
     # Where the nightly database dumps are (mounted read-only into the API to show them).
     backup_dir: str = "/backups"
+    # Windows install: the worker and the scheduler exit when this file exists (see app/deploy).
+    stop_file: str | None = None
 
     log_level: str = "INFO"
 

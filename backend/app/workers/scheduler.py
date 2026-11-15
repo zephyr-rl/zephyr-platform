@@ -18,7 +18,7 @@ from datetime import datetime
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core import jobs
+from app.core import jobs, stopfile
 from app.core.config import get_settings
 from app.core.db import utcnow
 from app.core.logging import configure_logging
@@ -78,6 +78,7 @@ async def main() -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         with contextlib.suppress(NotImplementedError):
             loop.add_signal_handler(sig, stop.set)
+    watcher = asyncio.create_task(stopfile.watch(settings.stop_file, stop.set))
 
     async with platform.db.engine.connect() as conn:
         while not stop.is_set():
@@ -98,6 +99,7 @@ async def main() -> None:
                 log.exception("scheduler round failed")
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(stop.wait(), 5)
+    watcher.cancel()
     await platform.db.dispose()
 
 
