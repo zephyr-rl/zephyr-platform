@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.v1 import (
     auth,
+    combined,
     listings,
     messages,
     notifications,
@@ -59,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(reports.router)
     api.include_router(reminders.router)
     api.include_router(search.router)
+    api.include_router(combined.router)
     api.include_router(notifications.router)
     for router in platform.module_context.routers:
         api.include_router(router)

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { Badge, Card, EmptyState, StatusDot } from "@/components/ui";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { ScopeSwitch, useScope } from "@/components/Scope";
+import { Badge, Button, Card, EmptyState, StatusDot } from "@/components/ui";
 import { api, type Connection, type JobsSummary, type ReportSummary, type StockPool, type StoreModule } from "@/lib/api";
 
 interface Activity {
@@ -49,8 +50,133 @@ function Figure({ label, value, tone }: { label: string; value: string | number;
   );
 }
 
+interface CombinedOverview {
+  currency: string;
+  stores: {
+    store_id: number;
+    store: string;
+    shadow_mode: boolean;
+    revenue_today: string;
+    orders_today: number;
+    accounts_today: number;
+    orders_need_you: number;
+    buyers_waiting: number;
+    urgent_messages: number;
+    low_pools: number;
+  }[];
+  activity: { id: number; at: string; store: string | null; actor: string; action: string }[];
+}
+
+function AllStoresOverview() {
+  const { select } = useStores();
+  const navigate = useNavigate();
+  const data = useQuery({
+    queryKey: ["all", "overview"],
+    queryFn: () => api<CombinedOverview>("/all/overview"),
+    refetchInterval: 30_000,
+  });
+  const d = data.data;
+  const money = (v: number | string) => new Intl.NumberFormat(undefined, { style: "currency", currency: d?.currency ?? "USD" }).format(Number(v));
+  const sum = (pick: (s: CombinedOverview["stores"][number]) => number) => d?.stores.reduce((t, s) => t + pick(s), 0) ?? 0;
+  const open = (storeId: number, to: "/" | "/orders" | "/messages" | "/stock") => {
+    select(storeId);
+    void navigate({ to });
+  };
+  return (
+    <>
+      <section aria-label="Today, all stores" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <Figure label="Revenue today" value={d ? money(sum((s) => Number(s.revenue_today))) : "—"} />
+        <Figure label="Orders today" value={d ? sum((s) => s.orders_today) : "—"} />
+        <Figure label="Accounts delivered today" value={d ? sum((s) => s.accounts_today) : "—"} />
+        <Figure label="Orders that need you" value={d ? sum((s) => s.orders_need_you) : "—"} tone={sum((s) => s.orders_need_you) ? "warning" : undefined} />
+      </section>
+      <Card title="Stores">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] border-collapse text-[13px]">
+            <thead>
+              <tr className="text-left text-muted">
+                <th className="px-4 py-2.5 font-medium">Store</th>
+                <th className="px-4 py-2.5 text-right font-medium">Revenue today</th>
+                <th className="px-4 py-2.5 text-right font-medium">Orders</th>
+                <th className="px-4 py-2.5 text-right font-medium">Accounts</th>
+                <th className="px-4 py-2.5 text-right font-medium">Need you</th>
+                <th className="px-4 py-2.5 text-right font-medium">Buyers waiting</th>
+                <th className="px-4 py-2.5 text-right font-medium">Low pools</th>
+                <th className="px-4 py-2.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {d?.stores.map((s) => (
+                <tr key={s.store_id} className="border-t border-line">
+                  <td className="px-4 py-2.5">
+                    <span className="font-medium">{s.store}</span>
+                    {s.shadow_mode && <span className="ml-2 text-[12px] text-warning">shadow mode</span>}
+                  </td>
+                  <td className="tabular px-4 py-2.5 text-right">{money(s.revenue_today)}</td>
+                  <td className="tabular px-4 py-2.5 text-right">{s.orders_today}</td>
+                  <td className="tabular px-4 py-2.5 text-right">{s.accounts_today}</td>
+                  <td className="tabular px-4 py-2.5 text-right">
+                    {s.orders_need_you ? (
+                      <button type="button" className="font-semibold text-warning hover:underline" onClick={() => open(s.store_id, "/orders")}>
+                        {s.orders_need_you}
+                      </button>
+                    ) : (
+                      0
+                    )}
+                  </td>
+                  <td className="tabular px-4 py-2.5 text-right">
+                    {s.buyers_waiting ? (
+                      <button type="button" className="font-semibold text-warning hover:underline" onClick={() => open(s.store_id, "/messages")}>
+                        {s.buyers_waiting}
+                        {s.urgent_messages ? ` (${s.urgent_messages} urgent)` : ""}
+                      </button>
+                    ) : (
+                      0
+                    )}
+                  </td>
+                  <td className="tabular px-4 py-2.5 text-right">
+                    {s.low_pools ? (
+                      <button type="button" className="font-semibold text-warning hover:underline" onClick={() => open(s.store_id, "/stock")}>
+                        {s.low_pools}
+                      </button>
+                    ) : (
+                      0
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <Button size="sm" onClick={() => open(s.store_id, "/")}>
+                      Open
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+      <Card title="Recent activity, all stores">
+        {d && d.activity.length === 0 ? (
+          <EmptyState title="Nothing recorded yet" />
+        ) : (
+          <ul className="divide-y divide-line">
+            {d?.activity.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-2.5 text-[13px]">
+                <span className="font-medium">{actionLabel(a.action)}</span>
+                {a.store && <span className="rounded-sm bg-hover px-1.5 text-[12px]">{a.store}</span>}
+                <span className="text-muted">by {a.actor}</span>
+                <span className="ml-auto text-muted">{timeOnly.format(new Date(a.at))}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </>
+  );
+}
+
 export function OverviewPage() {
   const { store, stores, loading } = useStores();
+  const [scope, setScope] = useScope("overview");
   const storeId = store?.id;
   const connections = useQuery({
     queryKey: ["stores", storeId, "connections"],
@@ -113,9 +239,24 @@ export function OverviewPage() {
   const connection = connections.data?.[0];
   const counts = jobs.data?.counts;
 
+  const header = (
+    <div className="flex flex-wrap items-center gap-3">
+      <h1 className="text-[22px] font-semibold">Overview</h1>
+      {stores.length > 1 && store && <ScopeSwitch scope={scope} onChange={setScope} storeName={store.name} />}
+    </div>
+  );
+  if (scope === "all" && stores.length > 1) {
+    return (
+      <>
+        {header}
+        <AllStoresOverview />
+      </>
+    );
+  }
+
   return (
     <>
-      <h1 className="text-[22px] font-semibold">Overview</h1>
+      {header}
 
       {store?.shadow_mode && (
         <div role="status" className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3">

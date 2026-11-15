@@ -68,7 +68,14 @@ Starting it needs the VPS and the owner. Prepared:
   is no domain; documented in `.env.example` and DEPLOY.md). CI now starts the stack exactly as
   on the VPS and gets the panel and the API through Caddy.
 
-## What I need from you
+## Owner's answers (2026-11-15)
+
+- Discord test script: run; the messages were sent.
+- "All stores": added to Overview and Reports only. Two-factor sign-in: not wanted.
+- No Linux VPS yet: Stage 10 runs on the Windows Server 2022 remote desktop where the old bots
+  run (16 GB RAM, 6 vCPU, 140 GB disk).
+
+## What I needed from you (answered)
 
 1. Run `send_discord_tests.py` on the PC and tell me if the messages look right (14 in total: one test per channel, and per store an example sale, buyer message and daily report).
 2. Decide on "All stores" and two-factor sign-in (Stage 9 leftovers).

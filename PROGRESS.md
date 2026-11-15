@@ -22,6 +22,11 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
 - 2026-11-14: **Restock has no separate "offer groups".** Listings that share a stock pool
   (the PC / PlayStation / Xbox offers of the old groups) draw from the same accounts, and the
   stock locks make sure an account goes to one vault only.
+- 2026-11-15: **No two-factor sign-in** (owner's decision): sign-in stays with the password
+  only. **"All stores" only in Overview and Reports** (owner's decision), as a switch on those
+  two pages; every other page works per store.
+- 2026-11-15: **Stage 10 runs on the Windows Server 2022 remote desktop** (where the old bots
+  run) until the Linux VPS exists: native install without Docker (see docs/DEPLOY-WINDOWS.md).
 - 2026-11-14: **A top-up is never marked delivered by the platform.** When the Top-Ups module is
   on, the instructions are sent and the order waits in Orders → Needs you ("Top-up: waiting for
   you") until the owner does it and marks it delivered on the marketplace.
@@ -236,6 +241,18 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     answer through Caddy. It found that access by IP (no domain) failed at the TLS handshake:
     browsers send no server name to an IP; fixed with `ZP_DEFAULT_SNI` in the Caddyfile.
   - Tests: 275 backend (3 new).
+
+- 2026-11-15: **All stores in Overview and Reports.**
+  - A "<store> / All stores" switch on both pages (remembered per page in the browser).
+  - Overview, all stores: today's totals, one row per store (revenue, orders, accounts, orders
+    that need you, buyers waiting, low pools; each number opens that store's page), activity
+    of every store with its name.
+  - Reports, all stores: the same numbers added up, each store's days in its own time zone
+    (Kawai smurf: Madrid), plus "By store"; listings and pools show their store. The CSV export
+    stays per store.
+  - API: `GET /all/summary`, `GET /all/overview`.
+  - The old system's SQLite database is opened read-only with its path quoted (Windows folders
+    have spaces).
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

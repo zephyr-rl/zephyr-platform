@@ -4,6 +4,23 @@ import { ColumnChart } from "@/components/charts/ColumnChart";
 import { Button, Card, EmptyState } from "@/components/ui";
 import { api, type DailyReportRow, type ReportSummary } from "@/lib/api";
 import { useStores } from "@/lib/session";
+import { ScopeSwitch, useScope } from "@/components/Scope";
+
+type Summary = Omit<
+  ReportSummary,
+  "timezone" | "today" | "by_listing" | "stock"
+> & {
+  timezone?: string;
+  by_listing: (ReportSummary["by_listing"][number] & { store?: string })[];
+  stock: (ReportSummary["stock"][number] & { store?: string })[];
+  by_store?: {
+    store_id: number;
+    store: string;
+    revenue: string;
+    orders: number;
+    accounts: number;
+  }[];
+};
 
 type Preset = "today" | "yesterday" | "7d" | "30d" | "month" | "custom";
 
@@ -81,8 +98,10 @@ function ShareBar({ share }: { share: number }) {
 }
 
 export function ReportsPage() {
-  const { store } = useStores();
+  const { store, stores } = useStores();
   const storeId = store?.id;
+  const [scope, setScope] = useScope("reports");
+  const all = scope === "all" && stores.length > 1;
   const [preset, setPreset] = useState<Preset>("7d");
   const [custom, setCustom] = useState({ start: "", end: "" });
   const [asTable, setAsTable] = useState(false);
@@ -103,10 +122,12 @@ export function ReportsPage() {
       )
     : null;
   const summary = useQuery({
-    queryKey: ["reports", storeId, r?.start, r?.end],
+    queryKey: ["reports", all ? "all" : storeId, r?.start, r?.end],
     queryFn: () =>
-      api<ReportSummary>(
-        `/stores/${storeId}/reports/summary?start=${r?.start}&end=${r?.end}`,
+      api<Summary>(
+        all
+          ? `/all/summary?start=${r?.start}&end=${r?.end}`
+          : `/stores/${storeId}/reports/summary?start=${r?.start}&end=${r?.end}`,
       ),
     enabled: storeId !== undefined && r !== null,
     placeholderData: (previous) => previous,
@@ -134,9 +155,10 @@ export function ReportsPage() {
     }).format(v);
   const revenue = Number(s?.revenue ?? 0);
   const multiDay = s ? s.series.length > 1 : false;
-  const csvHref = r
-    ? `/api/v1/stores/${storeId}/reports/export.csv?start=${r.start}&end=${r.end}`
-    : undefined;
+  const csvHref =
+    r && !all
+      ? `/api/v1/stores/${storeId}/reports/export.csv?start=${r.start}&end=${r.end}`
+      : undefined;
 
   return (
     <>
@@ -144,11 +166,19 @@ export function ReportsPage() {
         <div>
           <h1 className="text-[22px] font-semibold">Reports</h1>
           <p className="mt-1 text-muted">
-            {store.name}'s sales, in the store's time zone (
-            {s?.timezone ?? store.timezone}). Cancelled, refunded and unpaid
-            orders are not counted as sales.
+            {all
+              ? "All stores added up, each store's days in its own time zone."
+              : `${store.name}'s sales, in the store's time zone (${s?.timezone ?? store.timezone}).`}{" "}
+            Cancelled, refunded and unpaid orders are not counted as sales.
           </p>
         </div>
+        {stores.length > 1 && (
+          <ScopeSwitch
+            scope={scope}
+            onChange={setScope}
+            storeName={store.name}
+          />
+        )}
       </div>
 
       <div
@@ -314,6 +344,49 @@ export function ReportsPage() {
           </Card>
         )}
 
+        {all && s?.by_store && (
+          <Card title="By store">
+            <table className="w-full border-collapse text-[13px]">
+              <thead>
+                <tr className="text-left text-muted">
+                  <th className="px-4 py-2.5 font-medium">Store</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Orders</th>
+                  <th className="px-4 py-2.5 text-right font-medium">
+                    Accounts
+                  </th>
+                  <th className="px-4 py-2.5 text-right font-medium">
+                    Revenue
+                  </th>
+                  <th className="w-40 px-4 py-2.5 font-medium">
+                    <span className="sr-only">Share of revenue</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {s.by_store.map((b) => (
+                  <tr key={b.store_id} className="border-t border-line">
+                    <td className="px-4 py-2.5">{b.store}</td>
+                    <td className="tabular px-4 py-2.5 text-right">
+                      {b.orders}
+                    </td>
+                    <td className="tabular px-4 py-2.5 text-right">
+                      {b.accounts}
+                    </td>
+                    <td className="tabular px-4 py-2.5 text-right">
+                      {fmt(b.revenue)}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <ShareBar
+                        share={revenue ? Number(b.revenue) / revenue : 0}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <Card title="By product type">
             {s && s.by_type.length === 0 ? (
@@ -369,10 +442,15 @@ export function ReportsPage() {
               <ul className="flex flex-col">
                 {s?.stock.map((p) => (
                   <li
-                    key={p.pool_id}
+                    key={`${p.store ?? ""}-${p.pool_id}`}
                     className="flex items-center justify-between border-t border-line px-4 py-2.5 text-[13px] first:border-t-0"
                   >
-                    <span>{p.pool}</span>
+                    <span>
+                      {p.store && (
+                        <span className="text-muted">{p.store} · </span>
+                      )}
+                      {p.pool}
+                    </span>
                     <span className="tabular">
                       {p.available.toLocaleString()} available
                     </span>
@@ -409,10 +487,17 @@ export function ReportsPage() {
                 <tbody>
                   {s?.by_listing.map((l) => (
                     <tr
-                      key={`${l.listing_id}-${l.title}`}
+                      key={`${l.store ?? ""}-${l.listing_id}-${l.title}`}
                       className="border-t border-line"
                     >
-                      <td className="px-4 py-2.5">{l.title}</td>
+                      <td className="px-4 py-2.5">
+                        {l.title}
+                        {l.store && (
+                          <span className="block text-[12px] text-muted">
+                            {l.store}
+                          </span>
+                        )}
+                      </td>
                       <td className="tabular px-4 py-2.5 text-right">
                         {l.orders}
                       </td>
@@ -435,7 +520,11 @@ export function ReportsPage() {
           )}
         </Card>
 
-        <Card title="Daily reports sent">
+        <Card
+          title={
+            all ? `Daily reports sent (${store.name})` : "Daily reports sent"
+          }
+        >
           {daily.data && daily.data.length === 0 ? (
             <EmptyState title="No daily report yet">
               The report is sent once a day at the time set in Automation →

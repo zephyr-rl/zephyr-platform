@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
@@ -124,7 +125,9 @@ class LegacyData:
 def read_legacy(path: Path) -> LegacyData:
     if not path.is_file():
         raise FileNotFoundError(path)
-    con = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+    # Read-only. The path is quoted for the URI (Windows folders have spaces: "Eldorado API - X").
+    uri = "file:" + quote(path.resolve().as_posix(), safe="/:") + "?mode=ro"
+    con = sqlite3.connect(uri, uri=True)
     try:
         tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         games = dict(con.execute("SELECT id, name FROM games")) if "games" in tables else {}
