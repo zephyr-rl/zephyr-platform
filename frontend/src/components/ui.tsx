@@ -126,7 +126,7 @@ export function StatusDot({ tone, children }: { tone: "success" | "warning" | "d
 
 // ---- Form fields -------------------------------------------------------------------------
 
-const inputCls =
+export const inputCls =
   "min-h-10 w-full rounded-md border bg-bg px-3 py-2 text-fg placeholder:text-muted/70 disabled:opacity-60";
 
 interface FieldProps {

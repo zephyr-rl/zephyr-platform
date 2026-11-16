@@ -275,6 +275,11 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
   a repeat; the first real install on the server stopped there because Python's hidden prompt
   showed nothing while typing. The password reaches `create-owner` through a temporary
   environment variable that is removed right after.
+- 2026-11-15: **Time zone picker** in Settings > Stores: type a city, country or offset
+  (`utc-03`), pick from the list (offset shown). `GET /timezones` lists the tz database the
+  backend uses (Region/City names plus UTC, old duplicate names of the same city hidden);
+  aliases a browser reports are still accepted. On the server the owner had typed
+  "Buenos Aires/Argentina", which is not a tz name.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

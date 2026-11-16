@@ -12,6 +12,7 @@ import {
   type Store,
 } from "@/lib/api";
 import { useStores } from "@/lib/session";
+import { browserTimeZone, TimeZoneSelect } from "@/components/TimeZoneSelect";
 
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 const fmt = (iso: string) => dateTime.format(new Date(iso));
@@ -31,7 +32,7 @@ function CreateStoreForm() {
   const queryClient = useQueryClient();
   const { select } = useStores();
   const [name, setName] = useState("");
-  const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const [timezone, setTimezone] = useState(browserTimeZone);
   const create = useMutation({
     mutationFn: () => api<Store>("/stores", { method: "POST", body: { name, slug: slugify(name), timezone } }),
     onSuccess: async (store) => {
@@ -51,7 +52,7 @@ function CreateStoreForm() {
   return (
     <form onSubmit={submit} className="flex flex-wrap items-end gap-3 border-t border-line p-4">
       <TextField label="New store name" value={name} onChange={(e) => setName(e.target.value)} className="min-w-56 flex-1" />
-      <TextField label="Time zone" value={timezone} onChange={(e) => setTimezone(e.target.value)} className="min-w-56 flex-1" />
+      <TimeZoneSelect label="Time zone" value={timezone} onChange={setTimezone} className="min-w-64 flex-1" />
       <Button type="submit" variant="primary" busy={create.isPending} disabled={!slugify(name)}>
         Create store
       </Button>
