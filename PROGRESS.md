@@ -303,6 +303,11 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     orders. Jewelry's time zone set to America/Argentina/Buenos_Aires from the old config
     (it had been created with Europe/Madrid). Channels do not post while stores are in shadow
     mode.
+- 2026-11-16: Owner's decisions: the 162 accounts in stock and in the old history stay
+  available (confirmed again after seeing where they came from: mostly category renames and
+  moves, Oct 2 - Nov 10). Jewelry's time zone set to **Europe/Madrid** (audited store update);
+  running `migrate-legacy-settings` again for Jewelry would put the old config's Buenos Aires
+  back, so do not re-run it without checking.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off
