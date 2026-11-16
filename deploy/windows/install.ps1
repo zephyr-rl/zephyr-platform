@@ -106,9 +106,28 @@ if ((Invoke-Py $Root @('-m', 'app.deploy.setup', 'has-owner', '--root', $Root)) 
         if ($NonInteractive) { throw 'No owner account: pass -OwnerEmail.' }
         $OwnerEmail = Read-Host 'Your e-mail for signing in'
     }
-    $cli = @('-m', 'app.deploy.run', '--root', $Root, 'create-owner', '--email', $OwnerEmail)
-    if ($OwnerPasswordEnv) { $cli += @('--password-env', $OwnerPasswordEnv) }
-    if ((Invoke-Py $Root $cli) -ne 0) { throw 'Creating the owner account failed.' }
+    if (-not $OwnerPasswordEnv) {
+        # Asked here, not by Python: Read-Host shows a * for every character typed.
+        while ($true) {
+            $first = Read-Host 'Password for the panel (12+ characters, shown as *)' -AsSecureString
+            $second = Read-Host 'Repeat the password' -AsSecureString
+            $a = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($first))
+            $b = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($second))
+            if ($a -ne $b) { Write-Host '    The passwords do not match. Try again.' -ForegroundColor Yellow; continue }
+            if ($a.Length -lt 12) { Write-Host '    At least 12 characters. Try again.' -ForegroundColor Yellow; continue }
+            break
+        }
+        $env:ZP_INSTALL_OWNER_PASSWORD = $a
+        $OwnerPasswordEnv = 'ZP_INSTALL_OWNER_PASSWORD'
+        $a = $null; $b = $null
+    }
+    $cli = @('-m', 'app.deploy.run', '--root', $Root, 'create-owner', '--email', $OwnerEmail, '--password-env', $OwnerPasswordEnv)
+    try {
+        $code = Invoke-Py $Root $cli
+    } finally {
+        Remove-Item Env:ZP_INSTALL_OWNER_PASSWORD -ErrorAction SilentlyContinue
+    }
+    if ($code -ne 0) { throw 'Creating the owner account failed (see the message above). Run INSTALL.bat again.' }
 }
 
 Write-Step 'Starting automatically with Windows'

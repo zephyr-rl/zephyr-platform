@@ -271,6 +271,10 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
   - `create-owner --password-env` for unattended installs.
   - CI job `windows-kit` (windows-2022) builds the kit and runs INSTALL, sign-in, backup,
     CHECK, a second INSTALL (keys unchanged), UPDATE, STOP and START for real.
+- 2026-11-15: **Installer: owner password asked by PowerShell** with a `*` per character and
+  a repeat; the first real install on the server stopped there because Python's hidden prompt
+  showed nothing while typing. The password reaches `create-owner` through a temporary
+  environment variable that is removed right after.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off
