@@ -85,6 +85,7 @@ class Listing(TimestampMixin, Base):
     price_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
     remote_quantity: Mapped[int | None] = mapped_column(Integer)
+    platform: Mapped[str | None] = mapped_column(String(80))
     removed_remotely: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

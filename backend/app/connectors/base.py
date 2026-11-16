@@ -88,6 +88,7 @@ class RemoteOffer(_Model):
     price: Money
     quantity: int | None = None
     kind: OfferKind = OfferKind.account
+    platform: str | None = None  # "PC", "PlayStation", ... when the marketplace says
     raw: dict[str, Any] = Field(default_factory=dict, repr=False)
 
 

@@ -331,6 +331,20 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
   Kawai's and Jewelry's offers attach when their offers are read from the marketplace.
   Stores stay in shadow mode: restock only records what it would upload.
   `zephyr.bat` now prints reports as UTF-8 (offer names with emoji broke the Windows console).
+- 2026-11-16: **Listings split in tabs, like the old system** (owner's request, plan approved).
+  - Tabs Accounts (default) / Custom items / Top-ups, with counts; the tab is in the address
+    (`/listings?tab=items`). Search by title, state filter (All / Active / Paused / Closed)
+    and "Show offers gone from Eldorado" (off by default) on every tab.
+  - Accounts: "Automatic restock" switch in the header (the store's Restock module, same as
+    Automation → Restock). Turning it off is immediate; turning it on in a live store asks
+    first. Then the cross-platform cards and the account offers table.
+  - Custom items and Top-ups: compact cards (no images, owner's decision). Item card: price,
+    units on Eldorado, pool and accounts left (or "Message only"), delivery mode, units per
+    sale, CONFIRM, a switch for automatic delivery (off = Manual), first line of the
+    message, Eldorado link, Edit. Top-up card: price, platform, units, "Send instructions"
+    switch, own or general message, "N wait for you" linking to Orders filtered to that offer.
+  - Listings store the offer's platform (Eldorado `tradeEnvironmentValues`); the listings API
+    returns `platform` and `orders_need_you`; `GET /orders?listing_id=`.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

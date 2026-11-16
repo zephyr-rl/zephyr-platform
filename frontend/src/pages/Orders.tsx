@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearch } from "@tanstack/react-router";
+import { Link, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge, Button, Card, ConfirmDialog, EmptyState, Modal, TextField } from "@/components/ui";
@@ -136,9 +136,11 @@ export function OrdersPage() {
   useEffect(() => {
     if (search.order) setOpen(search.order);
   }, [search.order]);
+  const listingId = search.listing;
   const orders = useQuery({
-    queryKey: ["orders", storeId, show],
-    queryFn: () => api<OrderRow[]>(`/stores/${storeId}/orders?show=${show}`),
+    queryKey: ["orders", storeId, show, listingId ?? null],
+    queryFn: () =>
+      api<OrderRow[]>(`/stores/${storeId}/orders?show=${show}${listingId ? `&listing_id=${listingId}` : ""}`),
     enabled: storeId !== undefined,
     refetchInterval: 15_000,
   });
@@ -157,6 +159,14 @@ export function OrdersPage() {
           <p className="mt-1 text-muted">
             {store.name} orders and their delivery.{store.shadow_mode && " Shadow mode: nothing is sent to buyers."}
           </p>
+          {listingId && (
+            <p className="mt-1 text-[13px]">
+              Only the orders of one offer.{" "}
+              <Link to="/orders" className="text-accent underline">
+                Show every offer
+              </Link>
+            </p>
+          )}
         </div>
         <Button className="ml-auto" busy={poll.isPending} onClick={() => poll.mutate()}>
           Check for new orders

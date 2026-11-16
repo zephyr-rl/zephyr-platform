@@ -74,7 +74,10 @@ const routeTree = rootRoute.addChildren([
       getParentRoute: () => appRoute,
       path: "/orders",
       component: OrdersPage,
-      validateSearch: (s: Record<string, unknown>): { order?: number } => (Number(s.order) > 0 ? { order: Number(s.order) } : {}),
+      validateSearch: (s: Record<string, unknown>): { order?: number; listing?: number } => ({
+        ...(Number(s.order) > 0 ? { order: Number(s.order) } : {}),
+        ...(Number(s.listing) > 0 ? { listing: Number(s.listing) } : {}),
+      }),
     }),
     createRoute({ getParentRoute: () => appRoute, path: "/stock", component: StockPage }),
     createRoute({
@@ -84,7 +87,13 @@ const routeTree = rootRoute.addChildren([
       validateSearch: (s: Record<string, unknown>): { item?: number; hint?: string } =>
         Number(s.item) > 0 ? { item: Number(s.item), hint: typeof s.hint === "string" ? s.hint : undefined } : {},
     }),
-    createRoute({ getParentRoute: () => appRoute, path: "/listings", component: ListingsPage }),
+    createRoute({
+      getParentRoute: () => appRoute,
+      path: "/listings",
+      component: ListingsPage,
+      validateSearch: (s: Record<string, unknown>): { tab?: "accounts" | "items" | "topups" } =>
+        s.tab === "items" || s.tab === "topups" ? { tab: s.tab } : {},
+    }),
     createRoute({ getParentRoute: () => appRoute, path: "/messages", component: MessagesPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/reports", component: ReportsPage }),
     createRoute({ getParentRoute: () => appRoute, path: "/reminders", component: RemindersPage }),

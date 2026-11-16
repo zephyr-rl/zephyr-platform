@@ -468,6 +468,7 @@ export function CrossPlatformCards({
   defaultTarget,
   editCardId,
   onEditDone,
+  query = "",
 }: {
   storeId: number;
   shadow: boolean;
@@ -475,6 +476,8 @@ export function CrossPlatformCards({
   pools: StockPool[];
   restockOn: boolean;
   defaultTarget: number;
+  /** Only the cards whose name contains these words. */
+  query?: string;
   /** Open this card's editor (from a member row in the listings table). */
   editCardId?: number | null;
   onEditDone?: () => void;
@@ -484,9 +487,13 @@ export function CrossPlatformCards({
     queryFn: () => api<ListingCard[]>(`/stores/${storeId}/listing-groups`),
   });
   const [editing, setEditing] = useState<ListingCard | "new" | null>(null);
-  const list = cards.data ?? [];
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const all = cards.data ?? [];
+  const list = all.filter((c) =>
+    words.every((w) => c.title.toLowerCase().includes(w)),
+  );
   const fromRow = editCardId
-    ? list.find((c) => c.id === editCardId)
+    ? all.find((c) => c.id === editCardId)
     : undefined;
   const open = fromRow ?? editing;
   const close = () => {
@@ -503,7 +510,11 @@ export function CrossPlatformCards({
         </Button>
       }
     >
-      {list.length === 0 ? (
+      {list.length === 0 && all.length > 0 ? (
+        <p className="px-4 py-4 text-[13px] text-muted">
+          No card matches the search.
+        </p>
+      ) : list.length === 0 ? (
         <p className="px-4 py-4 text-[13px] text-muted">
           One product sold as a PC, PlayStation and Xbox offer, all filled from
           one stock pool. None yet.

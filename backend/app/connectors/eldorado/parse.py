@@ -125,6 +125,12 @@ def is_top_up(data: dict[str, Any]) -> bool:
     )
 
 
+def platform_of(data: dict[str, Any]) -> str | None:
+    values = data.get("tradeEnvironmentValues") or []
+    names = [str(v.get("value")).strip() for v in values if isinstance(v, dict) and v.get("value")]
+    return ", ".join(dict.fromkeys(names))[:80] or None
+
+
 def parse_offer(data: dict[str, Any], kind: OfferKind) -> RemoteOffer:
     state_text = str(first(data, "offerState", "state", "status") or "").lower()
     quantity = first(data, "quantity", "availableQuantity", "stock")
@@ -140,6 +146,7 @@ def parse_offer(data: dict[str, Any], kind: OfferKind) -> RemoteOffer:
         price=money(first(data, "pricePerUnit", "price", "unitPrice")),
         quantity=int(quantity) if quantity is not None else None,
         kind=kind,
+        platform=platform_of(data),
         raw=data,
     )
 

@@ -76,6 +76,7 @@ async def sync_listings(
                 "price_amount": offer.price.amount,
                 "currency": offer.price.currency[:3],
                 "remote_quantity": offer.quantity,
+                "platform": offer.platform,
                 "removed_remotely": False,
                 "last_synced_at": now,
             }

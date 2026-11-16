@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -24,6 +24,7 @@ import {
   type VaultUpload,
 } from "@/lib/api";
 import { CrossPlatformCards } from "@/components/listings/CrossPlatformCards";
+import { ItemCard, TopupCard } from "@/components/listings/OfferCards";
 import { useStores } from "@/lib/session";
 import { plural } from "@/lib/stock";
 
@@ -595,12 +596,107 @@ function VaultCell({ listing, target }: { listing: Listing; target: number }) {
   );
 }
 
+type Tab = "accounts" | "items" | "topups";
+type StateFilter = "all" | "active" | "paused" | "closed";
+
+const TABS: { key: Tab; label: string; kind: Listing["kind"] }[] = [
+  { key: "accounts", label: "Accounts", kind: "account" },
+  { key: "items", label: "Custom items", kind: "item" },
+  { key: "topups", label: "Top-ups", kind: "topup" },
+];
+
+function RestockMaster({
+  storeId,
+  module,
+  shadow,
+}: {
+  storeId: number;
+  module?: StoreModule;
+  shadow: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const set = useMutation({
+    mutationFn: (enabled: boolean) =>
+      api<StoreModule>(`/stores/${storeId}/modules/restock`, {
+        method: "PUT",
+        body: { enabled, expected_version: module?.version },
+      }),
+    onSuccess: async (m) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["stores", storeId, "modules"],
+      });
+      toast.success(
+        m.enabled ? "Automatic restock on" : "Automatic restock off",
+        {
+          description: m.enabled
+            ? shadow
+              ? "Shadow mode: the uploads are only recorded."
+              : "The vaults are topped up from the stock pools."
+            : "Nothing is uploaded until you turn it on again. The vaults keep what they have.",
+        },
+      );
+    },
+    onError: (e) =>
+      toast.error("Could not change the restock", { description: e.message }),
+  });
+  if (!module) return null;
+  const every = Number(module.settings.interval_minutes ?? 1);
+  const label = (
+    <span className="text-[13px]">
+      Automatic restock{" "}
+      <span className={module.enabled ? "text-success" : "text-muted"}>
+        {module.enabled ? `on · every ${every} min` : "off"}
+      </span>
+    </span>
+  );
+  if (module.enabled || shadow)
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-line-strong px-3 py-1.5">
+        {label}
+        <Switch
+          checked={module.enabled}
+          disabled={set.isPending}
+          onCheckedChange={(v) => set.mutate(v)}
+          label="Automatic restock"
+        />
+      </div>
+    );
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-line-strong px-3 py-1.5">
+      {label}
+      <ConfirmDialog
+        trigger={
+          <Button size="sm" variant="primary">
+            Turn on
+          </Button>
+        }
+        title="Turn on automatic restock?"
+        description="Every vault with restock on (cards and single offers) is topped up from its stock pool. Uploaded accounts are sent to Eldorado and leave the stock for good."
+        confirmLabel="Turn on restock"
+        onConfirm={() => set.mutateAsync(true)}
+      />
+    </div>
+  );
+}
+
+const normalize = (t: string) =>
+  t
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "");
+
 export function ListingsPage() {
   const { store } = useStores();
   const storeId = store?.id;
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Listing | null>(null);
   const [editCard, setEditCard] = useState<number | null>(null);
+  const search = useSearch({ from: "/app/listings" });
+  const navigate = useNavigate();
+  const tab: Tab = search.tab ?? "accounts";
+  const [query, setQuery] = useState("");
+  const [stateFilter, setStateFilter] = useState<StateFilter>("all");
+  const [showGone, setShowGone] = useState(false);
   const listings = useQuery({
     queryKey: ["listings", storeId],
     queryFn: () => api<Listing[]>(`/stores/${storeId}/listings`),
@@ -647,7 +743,22 @@ export function ListingsPage() {
   });
 
   if (!store || storeId === undefined) return null;
-  const rows = listings.data ?? [];
+  const all = listings.data ?? [];
+  const words = normalize(query).split(/\s+/).filter(Boolean);
+  const visible = (l: Listing) =>
+    (showGone || !l.removed_remotely) &&
+    (stateFilter === "all" || l.remote_state === stateFilter) &&
+    words.every((w) => normalize(l.title).includes(w));
+  const kind = TABS.find((t) => t.key === tab)?.kind ?? "account";
+  const rows = all.filter((l) => l.kind === kind && visible(l));
+  const counts = Object.fromEntries(
+    TABS.map((t) => [
+      t.key,
+      all.filter((l) => l.kind === t.kind && (showGone || !l.removed_remotely))
+        .length,
+    ]),
+  ) as Record<Tab, number>;
+  const allRows = all;
   const lastSync = rows
     .map((l) => l.last_synced_at)
     .filter(Boolean)
@@ -665,164 +776,313 @@ export function ListingsPage() {
             {lastSync && ` Last read ${dateTime.format(new Date(lastSync))}.`}
           </p>
         </div>
-        <Button
-          variant="primary"
-          className="ml-auto"
-          busy={sync.isPending}
-          onClick={() => sync.mutate()}
-        >
-          Read offers from marketplace
-        </Button>
+        <div className="ml-auto flex flex-wrap items-center gap-3">
+          {tab === "accounts" && (
+            <RestockMaster
+              storeId={storeId}
+              module={restockModule}
+              shadow={store.shadow_mode}
+            />
+          )}
+          <Button
+            variant="primary"
+            busy={sync.isPending}
+            onClick={() => sync.mutate()}
+          >
+            Read offers from marketplace
+          </Button>
+        </div>
       </div>
 
-      <CrossPlatformCards
-        storeId={storeId}
-        shadow={store.shadow_mode}
-        listings={rows}
-        pools={pools.data ?? []}
-        restockOn={restock.enabled}
-        defaultTarget={restock.defaultTarget}
-        editCardId={editCard}
-        onEditDone={() => setEditCard(null)}
-      />
+      <div
+        role="tablist"
+        aria-label="Offer type"
+        className="flex gap-1 border-b border-line"
+      >
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            role="tab"
+            type="button"
+            aria-selected={tab === t.key}
+            onClick={() =>
+              void navigate({
+                to: "/listings",
+                search: t.key === "accounts" ? {} : { tab: t.key },
+              })
+            }
+            className={`-mb-px border-b-2 px-3 py-2 text-[14px] ${tab === t.key ? "border-accent font-medium text-fg" : "border-transparent text-muted hover:text-fg"}`}
+          >
+            {t.label}{" "}
+            <span className="tabular text-[12px] text-muted">
+              {counts[t.key]}
+            </span>
+          </button>
+        ))}
+      </div>
 
-      <Card title="All offers">
-        {listings.data && rows.length === 0 ? (
-          <EmptyState title="No listings yet">
-            Connect the marketplace in{" "}
-            <Link to="/settings" className="text-accent underline">
-              Settings
-            </Link>
-            , then read the offers. Reading changes nothing on the marketplace.
-          </EmptyState>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] border-collapse text-[13px]">
-              <thead>
-                <tr className="text-left text-muted">
-                  <th className="px-4 py-2.5 font-medium">Offer</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Price</th>
-                  <th className="px-4 py-2.5 text-right font-medium">
-                    On marketplace
-                  </th>
-                  <th className="px-4 py-2.5 font-medium">Stock pool</th>
-                  <th className="px-4 py-2.5 font-medium">Delivery</th>
-                  <th className="px-4 py-2.5" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((l) => (
-                  <tr
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          type="search"
+          aria-label="Search offers"
+          placeholder="Search by title"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="min-h-9 w-72 max-w-full rounded-md border border-line-strong bg-bg px-3 text-[13px]"
+        />
+        <div role="group" aria-label="State" className="flex gap-1">
+          {(["all", "active", "paused", "closed"] as StateFilter[]).map((f) => (
+            <Button
+              key={f}
+              size="sm"
+              variant={stateFilter === f ? "primary" : "ghost"}
+              aria-pressed={stateFilter === f}
+              onClick={() => setStateFilter(f)}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </Button>
+          ))}
+        </div>
+        <label className="ml-auto flex items-center gap-2 text-[13px] text-muted">
+          Show offers gone from Eldorado
+          <Switch
+            checked={showGone}
+            onCheckedChange={setShowGone}
+            label="Show offers gone from Eldorado"
+          />
+        </label>
+      </div>
+
+      {tab === "accounts" && (
+        <CrossPlatformCards
+          storeId={storeId}
+          shadow={store.shadow_mode}
+          listings={allRows}
+          query={query}
+          pools={pools.data ?? []}
+          restockOn={restock.enabled}
+          defaultTarget={restock.defaultTarget}
+          editCardId={editCard}
+          onEditDone={() => setEditCard(null)}
+        />
+      )}
+
+      {tab !== "accounts" && (
+        <Card>
+          {listings.data && rows.length === 0 ? (
+            <EmptyState
+              title={
+                counts[tab]
+                  ? "No offer matches"
+                  : tab === "items"
+                    ? `No custom item offers for ${store.name}`
+                    : `No top-up offers for ${store.name}`
+              }
+            >
+              {counts[tab]
+                ? "Change the search or the state filter."
+                : "Read the offers from the marketplace to bring them here."}
+            </EmptyState>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {rows.map((l) =>
+                tab === "items" ? (
+                  <ItemCard
                     key={l.id}
-                    className={`border-t border-line ${l.removed_remotely ? "opacity-60" : ""}`}
-                  >
-                    <td className="px-4 py-2.5">
-                      <div className="font-medium">{l.title}</div>
-                      <div className="mt-1 flex flex-wrap gap-1.5">
-                        <Badge tone="neutral">{KIND_LABEL[l.kind]}</Badge>
-                        {l.group_id !== null && (
-                          <Badge tone="progress">
-                            Card ·{" "}
-                            {{ pc: "PC", playstation: "PlayStation", xbox: "Xbox" }[
-                              l.device ?? "pc"
-                            ]}
-                          </Badge>
-                        )}
-                        {l.removed_remotely ? (
-                          <Badge tone="danger">Gone from marketplace</Badge>
-                        ) : l.remote_state === "active" ? (
-                          <Badge tone="success">Active</Badge>
-                        ) : (
-                          <Badge tone="warning">
-                            {l.remote_state === "paused" ? "Paused" : "Closed"}
-                          </Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="tabular px-4 py-2.5 text-right">
-                      {money(l.price, l.currency)}
-                    </td>
-                    <td className="tabular px-4 py-2.5 text-right">
-                      {l.remote_quantity ?? "—"}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {l.pool_id ? (
-                        <Link
-                          to="/stock/$poolId"
-                          params={{ poolId: String(l.pool_id) }}
-                          className="hover:underline"
-                        >
-                          {l.pool_name}
-                        </Link>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {l.kind === "topup" ? (
-                        topupsModule?.enabled &&
-                        !(
-                          (topupsModule.settings.skip_offers as
-                            string[] | undefined) ?? []
-                        ).includes(l.remote_offer_id) ? (
-                          "Top-up: instructions sent, then you"
-                        ) : (
-                          "Top-up: by hand, nothing sent"
-                        )
-                      ) : l.restock_enabled ? (
-                        <VaultCell
-                          listing={l}
-                          target={l.restock_target ?? restock.defaultTarget}
-                        />
-                      ) : (
-                        <>
-                          {
-                            MODES.find((m) => m.value === l.delivery_mode)
-                              ?.label
-                          }
-                          {l.units_per_sale > 1 && (
-                            <span className="text-muted">
-                              {" "}
-                              · {l.units_per_sale} per unit
-                            </span>
-                          )}
-                          {l.require_confirmation && (
-                            <span className="text-muted"> · confirmation</span>
-                          )}
-                        </>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <div className="flex justify-end gap-2">
-                        {l.restock_enabled &&
-                          restock.enabled &&
-                          l.group_id === null &&
-                          !l.removed_remotely && (
-                            <RestockNow
-                              storeId={storeId}
-                              listing={l}
-                              shadow={store.shadow_mode}
-                              target={l.restock_target ?? restock.defaultTarget}
-                            />
-                          )}
-                        {l.group_id !== null ? (
-                          <Button size="sm" onClick={() => setEditCard(l.group_id)}>
-                            Edit card
-                          </Button>
-                        ) : (
-                          <Button size="sm" onClick={() => setEditing(l)}>
-                            Edit
-                          </Button>
-                        )}
-                      </div>
-                    </td>
+                    storeId={storeId}
+                    listing={l}
+                    pools={pools.data ?? []}
+                    onEdit={() => setEditing(l)}
+                  />
+                ) : (
+                  <TopupCard
+                    key={l.id}
+                    storeId={storeId}
+                    listing={l}
+                    topups={topupsModule}
+                    onEdit={() => setEditing(l)}
+                  />
+                ),
+              )}
+            </div>
+          )}
+        </Card>
+      )}
+      {tab === "topups" && topupsModule && !topupsModule.enabled && (
+        <p className="text-[13px] text-warning">
+          The Top-Ups module is off for this store: no instructions are sent
+          until you turn it on in{" "}
+          <Link to="/automation" className="underline">
+            Automation
+          </Link>
+          .
+        </p>
+      )}
+
+      {tab === "accounts" && (
+        <Card title="Account offers">
+          {listings.data && rows.length === 0 ? (
+            <EmptyState
+              title={counts.accounts ? "No offer matches" : "No listings yet"}
+            >
+              {counts.accounts ? (
+                "Change the search or the state filter."
+              ) : (
+                <>
+                  Connect the marketplace in{" "}
+                  <Link to="/settings" className="text-accent underline">
+                    Settings
+                  </Link>
+                  , then read the offers. Reading changes nothing on the
+                  marketplace.
+                </>
+              )}
+            </EmptyState>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] border-collapse text-[13px]">
+                <thead>
+                  <tr className="text-left text-muted">
+                    <th className="px-4 py-2.5 font-medium">Offer</th>
+                    <th className="px-4 py-2.5 text-right font-medium">
+                      Price
+                    </th>
+                    <th className="px-4 py-2.5 text-right font-medium">
+                      On marketplace
+                    </th>
+                    <th className="px-4 py-2.5 font-medium">Stock pool</th>
+                    <th className="px-4 py-2.5 font-medium">Delivery</th>
+                    <th className="px-4 py-2.5" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+                </thead>
+                <tbody>
+                  {rows.map((l) => (
+                    <tr
+                      key={l.id}
+                      className={`border-t border-line ${l.removed_remotely ? "opacity-60" : ""}`}
+                    >
+                      <td className="px-4 py-2.5">
+                        <div className="font-medium">{l.title}</div>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          <Badge tone="neutral">{KIND_LABEL[l.kind]}</Badge>
+                          {l.group_id !== null && (
+                            <Badge tone="progress">
+                              Card ·{" "}
+                              {
+                                {
+                                  pc: "PC",
+                                  playstation: "PlayStation",
+                                  xbox: "Xbox",
+                                }[l.device ?? "pc"]
+                              }
+                            </Badge>
+                          )}
+                          {l.removed_remotely ? (
+                            <Badge tone="danger">Gone from marketplace</Badge>
+                          ) : l.remote_state === "active" ? (
+                            <Badge tone="success">Active</Badge>
+                          ) : (
+                            <Badge tone="warning">
+                              {l.remote_state === "paused"
+                                ? "Paused"
+                                : "Closed"}
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="tabular px-4 py-2.5 text-right">
+                        {money(l.price, l.currency)}
+                      </td>
+                      <td className="tabular px-4 py-2.5 text-right">
+                        {l.remote_quantity ?? "—"}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {l.pool_id ? (
+                          <Link
+                            to="/stock/$poolId"
+                            params={{ poolId: String(l.pool_id) }}
+                            className="hover:underline"
+                          >
+                            {l.pool_name}
+                          </Link>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {l.kind === "topup" ? (
+                          topupsModule?.enabled &&
+                          !(
+                            (topupsModule.settings.skip_offers as
+                              string[] | undefined) ?? []
+                          ).includes(l.remote_offer_id) ? (
+                            "Top-up: instructions sent, then you"
+                          ) : (
+                            "Top-up: by hand, nothing sent"
+                          )
+                        ) : l.restock_enabled ? (
+                          <VaultCell
+                            listing={l}
+                            target={l.restock_target ?? restock.defaultTarget}
+                          />
+                        ) : (
+                          <>
+                            {
+                              MODES.find((m) => m.value === l.delivery_mode)
+                                ?.label
+                            }
+                            {l.units_per_sale > 1 && (
+                              <span className="text-muted">
+                                {" "}
+                                · {l.units_per_sale} per unit
+                              </span>
+                            )}
+                            {l.require_confirmation && (
+                              <span className="text-muted">
+                                {" "}
+                                · confirmation
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <div className="flex justify-end gap-2">
+                          {l.restock_enabled &&
+                            restock.enabled &&
+                            l.group_id === null &&
+                            !l.removed_remotely && (
+                              <RestockNow
+                                storeId={storeId}
+                                listing={l}
+                                shadow={store.shadow_mode}
+                                target={
+                                  l.restock_target ?? restock.defaultTarget
+                                }
+                              />
+                            )}
+                          {l.group_id !== null ? (
+                            <Button
+                              size="sm"
+                              onClick={() => setEditCard(l.group_id)}
+                            >
+                              Edit card
+                            </Button>
+                          ) : (
+                            <Button size="sm" onClick={() => setEditing(l)}>
+                              Edit
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
       {editing && (
         <EditListing
           storeId={storeId}

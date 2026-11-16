@@ -284,6 +284,8 @@ export interface Listing {
   last_restock_note: string | null;
   group_id: number | null;
   device: "pc" | "playstation" | "xbox" | null;
+  platform: string | null;
+  orders_need_you: number;
 }
 
 export interface CardDevice {

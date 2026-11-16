@@ -5,14 +5,16 @@ from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.deps import AuthDep, OwnerDep, PlatformDep, SessionDep
+from app.api.v1.orders import ATTENTION
 from app.core import audit
 from app.core.crypto import CryptoError
 from app.listings import groups, service
 from app.listings.models import DeliveryMode, Listing
 from app.modules.restock import service as restock
+from app.orders.models import Fulfilment, Order
 from app.stock.models import StockPool
 from app.stores.models import MarketplaceConnection, StoreModule
 from app.stores.service import NotFound as StoreNotFound
@@ -50,6 +52,8 @@ class ListingOut(BaseModel):
     last_restock_note: str | None
     group_id: int | None
     device: str | None
+    platform: str | None
+    orders_need_you: int  # orders of this listing waiting for the owner (top-ups, approvals)
 
 
 class ListingPatch(BaseModel):
@@ -98,6 +102,22 @@ class SyncOut(BaseModel):
 
 
 async def _out(session: SessionDep, listings: list[Listing]) -> list[ListingOut]:
+    need_you = (
+        dict(
+            (lid, n)
+            for lid, n in await session.execute(
+                select(Order.listing_id, func.count())
+                .join(Fulfilment, Fulfilment.order_id == Order.id)
+                .where(
+                    Order.listing_id.in_([x.id for x in listings]),
+                    Fulfilment.state.in_(ATTENTION),
+                )
+                .group_by(Order.listing_id)
+            )
+        )
+        if listings
+        else {}
+    )
     pools = {p.id: p.name for p in await session.scalars(select(StockPool))} if listings else {}
     connectors = (
         {c.id: c.connector_key for c in await session.scalars(select(MarketplaceConnection))}
@@ -134,6 +154,8 @@ async def _out(session: SessionDep, listings: list[Listing]) -> list[ListingOut]
             last_restock_note=x.last_restock_note,
             group_id=x.group_id,
             device=x.device,
+            platform=x.platform,
+            orders_need_you=need_you.get(x.id, 0),
         )
         for x in listings
     ]

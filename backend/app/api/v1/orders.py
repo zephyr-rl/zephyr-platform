@@ -123,6 +123,7 @@ async def list_orders(
     auth: AuthDep,
     session: SessionDep,
     show: Literal["attention", "waiting", "active", "all"] = "all",
+    listing_id: int | None = Query(None, description="Only the orders of this listing"),
     limit: int = Query(100, ge=1, le=500),
 ) -> list[OrderOut]:
     await _store(session, store_id)
@@ -133,6 +134,8 @@ async def list_orders(
         .order_by(Order.remote_created_at.desc())
         .limit(limit)
     )
+    if listing_id is not None:
+        stmt = stmt.where(Order.listing_id == listing_id)
     if show == "attention":
         stmt = stmt.where(Fulfilment.state.in_(ATTENTION))
     elif show == "waiting":
