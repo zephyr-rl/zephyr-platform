@@ -282,6 +282,40 @@ export interface Listing {
   vault_count: number | null;
   last_restock_at: string | null;
   last_restock_note: string | null;
+  group_id: number | null;
+  device: "pc" | "playstation" | "xbox" | null;
+}
+
+export interface CardDevice {
+  device: "pc" | "playstation" | "xbox";
+  label: string;
+  remote_offer_id: string | null;
+  listing_id: number | null;
+  title: string | null;
+  remote_state: string | null;
+  price: string | null;
+  currency: string | null;
+  vault_count: number | null;
+  remote_quantity: number | null;
+  removed_remotely: boolean;
+  last_restock_at: string | null;
+  last_restock_note: string | null;
+}
+
+export interface ListingCard {
+  id: number;
+  title: string;
+  pool_id: number | null;
+  pool_name: string | null;
+  pool_available: number | null;
+  restock_enabled: boolean;
+  restock_target: number | null;
+  effective_target: number;
+  auto_resume: boolean;
+  vault_additional_info: string | null;
+  include_email_details: boolean;
+  imported: boolean;
+  devices: CardDevice[];
 }
 
 export interface RestockResult {

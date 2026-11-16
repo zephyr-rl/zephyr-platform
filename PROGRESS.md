@@ -308,6 +308,23 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
   moves, Oct 2 - Nov 10). Jewelry's time zone set to **Europe/Madrid** (audited store update);
   running `migrate-legacy-settings` again for Jewelry would put the old config's Buenos Aires
   back, so do not re-run it without checking.
+- 2026-11-16: **Cross-platform cards** (the old system's "crossPlatformGroups"; missed in the
+  first plan, pointed out by the owner).
+  - `listing_groups` + `listings.group_id/device`. A card joins the PC, PlayStation and Xbox
+    offers of one product, one stock pool, one vault target per platform, the extra text,
+    e-mail details and auto-resume. The card copies its settings to its listings, so restock
+    keeps working per listing (same locks, same never-sold-twice rules), all from one pool.
+    A member listing refuses pool/vault changes of its own ("change it on the card").
+  - A card can wait for an offer not synced yet; "Read offers from marketplace" attaches it.
+  - API `/stores/{id}/listing-groups` (list, create, update, on/off, delete, restock now).
+    Deleting a card leaves the offers, with restock off.
+  - Panel: Listings → "Cross-platform cards" (platform state, vault n/target, pool stock,
+    on/off, Restock now, editor); member rows show "Card · PC" and "Edit card".
+  - Sale notifications get `{platform}` (PC / PlayStation / Xbox); the sale preset shows it.
+  - `migrate-legacy-restock`: restock module (on/off, interval rounded up to minutes, default
+    target), cards (matched by the old group id on re-runs), single offers with a category.
+    "Manual only" offers are left alone; extra-text presets are not imported (already in each
+    card).
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

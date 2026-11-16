@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.api.deps import AuthDep, OwnerDep, PlatformDep, SessionDep
 from app.core import audit
 from app.core.crypto import CryptoError
-from app.listings import service
+from app.listings import groups, service
 from app.listings.models import DeliveryMode, Listing
 from app.modules.restock import service as restock
 from app.stock.models import StockPool
@@ -48,6 +48,8 @@ class ListingOut(BaseModel):
     vault_count: int | None
     last_restock_at: datetime | None
     last_restock_note: str | None
+    group_id: int | None
+    device: str | None
 
 
 class ListingPatch(BaseModel):
@@ -92,6 +94,7 @@ class SyncOut(BaseModel):
     updated: int
     removed: int
     errors: list[str]
+    linked: int = 0  # offers attached to the cross-platform cards that were waiting for them
 
 
 async def _out(session: SessionDep, listings: list[Listing]) -> list[ListingOut]:
@@ -129,6 +132,8 @@ async def _out(session: SessionDep, listings: list[Listing]) -> list[ListingOut]
             vault_count=x.vault_count,
             last_restock_at=x.last_restock_at,
             last_restock_note=x.last_restock_note,
+            group_id=x.group_id,
+            device=x.device,
         )
         for x in listings
     ]
@@ -161,12 +166,14 @@ async def sync(
     await _store(session, store_id)
     try:
         result = await service.sync_listings(session, platform, auth.actor, store_id)
+        await session.flush()
+        linked = await groups.link_pending(session, auth.actor, store_id)
     except service.ListingError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
     except CryptoError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from None
     await session.commit()
-    return SyncOut(**result.__dict__)
+    return SyncOut(**result.__dict__, linked=linked)
 
 
 @router.patch("/{listing_id}", response_model=ListingOut)

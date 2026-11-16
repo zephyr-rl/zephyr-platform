@@ -106,6 +106,30 @@ async def migrate_legacy_settings(slug: str, folder: Path, *, dry_run: bool) -> 
     print(format_settings_report(report))
 
 
+async def migrate_legacy_restock(slug: str, folder: Path, *, dry_run: bool) -> None:
+    from app.legacy.restock import format_restock_report, migrate_restock
+    from app.stores.models import Store
+
+    platform = build_platform(get_settings())
+    try:
+        async with platform.db.sessionmaker() as session:
+            store = await session.scalar(select(Store).where(Store.slug == slug))
+            if store is None:
+                sys.exit(f"No store with slug {slug!r}. Create it in the panel first.")
+            name = store.name
+            report = await migrate_restock(
+                session,
+                platform,
+                Actor.system("migrate-legacy"),
+                folder=folder,
+                store_id=store.id,
+                dry_run=dry_run,
+            )
+    finally:
+        await platform.db.dispose()
+    print(format_restock_report(report, name))
+
+
 async def compare_shadow(slug: str, folder: Path, hours: int) -> int:
     from datetime import timedelta
 
@@ -165,6 +189,15 @@ def main(argv: list[str] | None = None) -> None:
         "--folder", required=True, type=Path, help="The old store folder (with config.json)"
     )
     legacy_settings.add_argument("--dry-run", action="store_true", help="Report only, save nothing")
+    legacy_restock = sub.add_parser(
+        "migrate-legacy-restock",
+        help="Import an old store's restock setup and cross-platform cards (read-only)",
+    )
+    legacy_restock.add_argument("--store", required=True, help="Slug of the store")
+    legacy_restock.add_argument(
+        "--folder", required=True, type=Path, help="The old store folder (with restock_config.json)"
+    )
+    legacy_restock.add_argument("--dry-run", action="store_true", help="Report only, save nothing")
     shadow_cmp = sub.add_parser(
         "compare-shadow",
         help="Compare the old system's logs with what the platform would have done (read-only)",
@@ -189,6 +222,10 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "compare-shadow":
         sys.exit(asyncio.run(compare_shadow(args.store, args.folder, args.hours)))
+
+    if args.command == "migrate-legacy-restock":
+        asyncio.run(migrate_legacy_restock(args.store, args.folder, dry_run=args.dry_run))
+        return
 
     if args.command == "migrate-legacy-settings":
         asyncio.run(migrate_legacy_settings(args.store, args.folder, dry_run=args.dry_run))

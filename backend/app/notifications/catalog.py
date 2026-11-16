@@ -40,6 +40,7 @@ _DELIVERY: dict[str, tuple[str, str]] = {
     "delivery": ("How it was delivered", "Automatic (chat)"),
     "pool": ("Stock pool used", "Fortnite accounts"),
     "stock_left": ("Accounts left in the pool", "41"),
+    "platform": ("Platform of a cross-platform card's offer", "PlayStation"),
     "bundle": ("Bundle detail when a unit has several accounts", "(1 unit x 2 accounts)"),
 }
 
@@ -212,6 +213,7 @@ PRESETS: tuple[Preset, ...] = (
                 _f("💰 Price", "**{total}**"),
                 _f("🔗 Order", "[Open #{short_order}]({order_url})"),
                 _f("🎮 Offer", "{title}", False),
+                _f("🕹️ Platform", "{platform}"),
                 _f("📁 Pool", "`{pool}`"),
                 _f("🔢 Accounts", "**{accounts}** {bundle}"),
                 _f("📊 Stock left", "**{stock_left}** accounts"),

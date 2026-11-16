@@ -23,6 +23,7 @@ import {
   type StoreModule,
   type VaultUpload,
 } from "@/lib/api";
+import { CrossPlatformCards } from "@/components/listings/CrossPlatformCards";
 import { useStores } from "@/lib/session";
 import { plural } from "@/lib/stock";
 
@@ -599,6 +600,7 @@ export function ListingsPage() {
   const storeId = store?.id;
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Listing | null>(null);
+  const [editCard, setEditCard] = useState<number | null>(null);
   const listings = useQuery({
     queryKey: ["listings", storeId],
     queryFn: () => api<Listing[]>(`/stores/${storeId}/listings`),
@@ -627,6 +629,7 @@ export function ListingsPage() {
         updated: number;
         removed: number;
         errors: string[];
+        linked: number;
       }>(`/stores/${storeId}/listings/sync`, { method: "POST" }),
     onSuccess: async (r) => {
       await queryClient.invalidateQueries({ queryKey: ["listings", storeId] });
@@ -636,7 +639,7 @@ export function ListingsPage() {
         });
       else
         toast.success("Offers updated from the marketplace", {
-          description: `${plural(r.created, "new offer")}, ${plural(r.updated, "updated offer")}${r.removed ? `, ${r.removed} no longer on the marketplace` : ""}.`,
+          description: `${plural(r.created, "new offer")}, ${plural(r.updated, "updated offer")}${r.removed ? `, ${r.removed} no longer on the marketplace` : ""}${r.linked ? `, ${plural(r.linked, "offer")} attached to cross-platform cards` : ""}.`,
         });
     },
     onError: (error) =>
@@ -672,7 +675,18 @@ export function ListingsPage() {
         </Button>
       </div>
 
-      <Card>
+      <CrossPlatformCards
+        storeId={storeId}
+        shadow={store.shadow_mode}
+        listings={rows}
+        pools={pools.data ?? []}
+        restockOn={restock.enabled}
+        defaultTarget={restock.defaultTarget}
+        editCardId={editCard}
+        onEditDone={() => setEditCard(null)}
+      />
+
+      <Card title="All offers">
         {listings.data && rows.length === 0 ? (
           <EmptyState title="No listings yet">
             Connect the marketplace in{" "}
@@ -706,6 +720,14 @@ export function ListingsPage() {
                       <div className="font-medium">{l.title}</div>
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         <Badge tone="neutral">{KIND_LABEL[l.kind]}</Badge>
+                        {l.group_id !== null && (
+                          <Badge tone="progress">
+                            Card ·{" "}
+                            {{ pc: "PC", playstation: "PlayStation", xbox: "Xbox" }[
+                              l.device ?? "pc"
+                            ]}
+                          </Badge>
+                        )}
                         {l.removed_remotely ? (
                           <Badge tone="danger">Gone from marketplace</Badge>
                         ) : l.remote_state === "active" ? (
@@ -774,6 +796,7 @@ export function ListingsPage() {
                       <div className="flex justify-end gap-2">
                         {l.restock_enabled &&
                           restock.enabled &&
+                          l.group_id === null &&
                           !l.removed_remotely && (
                             <RestockNow
                               storeId={storeId}
@@ -782,9 +805,15 @@ export function ListingsPage() {
                               target={l.restock_target ?? restock.defaultTarget}
                             />
                           )}
-                        <Button size="sm" onClick={() => setEditing(l)}>
-                          Edit
-                        </Button>
+                        {l.group_id !== null ? (
+                          <Button size="sm" onClick={() => setEditCard(l.group_id)}>
+                            Edit card
+                          </Button>
+                        ) : (
+                          <Button size="sm" onClick={() => setEditing(l)}>
+                            Edit
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

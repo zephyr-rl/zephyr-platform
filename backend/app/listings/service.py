@@ -134,11 +134,37 @@ async def get_listing(session: AsyncSession, store_id: int, listing_id: int) -> 
     return listing
 
 
+# Set by the listing's cross-platform card while it is in one (see listings/groups.py).
+CARD_SETTINGS = frozenset(
+    {
+        "pool_id",
+        "delivery_mode",
+        "restock_enabled",
+        "restock_target",
+        "auto_resume",
+        "vault_additional_info",
+        "include_email_details",
+    }
+)
+
+
 async def update_listing(
-    session: AsyncSession, actor: audit.Actor, listing: Listing, changes: dict[str, Any]
+    session: AsyncSession,
+    actor: audit.Actor,
+    listing: Listing,
+    changes: dict[str, Any],
+    *,
+    from_group: bool = False,
 ) -> Listing:
     before = {k: _plain(getattr(listing, k)) for k in SETTINGS}
     merged = {**before, **{k: v for k, v in changes.items() if k in SETTINGS}}
+    if listing.group_id is not None and not from_group:
+        changed = {k for k in CARD_SETTINGS if _plain(merged[k]) != before[k]}
+        if changed:
+            raise ListingError(
+                "This offer is part of a cross-platform card: change its pool and vault "
+                "settings on the card."
+            )
     mode = DeliveryMode(merged["delivery_mode"])
     pool_id = merged["pool_id"]
 

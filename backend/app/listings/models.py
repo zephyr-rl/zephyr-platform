@@ -5,6 +5,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -18,6 +19,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base, TimestampMixin
@@ -35,6 +37,34 @@ class DeliveryMode(enum.StrEnum):
 
 
 NEEDS_POOL = frozenset({DeliveryMode.auto, DeliveryMode.assisted})
+
+# The platforms a cross-platform card joins (one marketplace offer each).
+DEVICES: dict[str, str] = {"pc": "PC", "playstation": "PlayStation", "xbox": "Xbox"}
+
+
+class ListingGroup(TimestampMixin, Base):
+    """A cross-platform card: the same product sold as one offer per platform (PC, PlayStation,
+    Xbox), all filled from one stock pool with the same vault settings.
+
+    The card's settings are copied to its listings, so restock works per listing as usual.
+    ``devices`` keeps the offer id for each platform, also before the listing is synced."""
+
+    __tablename__ = "listing_groups"
+    __table_args__ = (UniqueConstraint("store_id", "legacy_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    store_id: Mapped[int] = mapped_column(
+        ForeignKey("stores.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    pool_id: Mapped[int | None] = mapped_column(ForeignKey("stock_pools.id", ondelete="RESTRICT"))
+    restock_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    restock_target: Mapped[int | None] = mapped_column(Integer)
+    auto_resume: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    vault_additional_info: Mapped[str | None] = mapped_column(Text)
+    include_email_details: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    devices: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    legacy_id: Mapped[str | None] = mapped_column(String(120))
 
 
 class Listing(TimestampMixin, Base):
@@ -78,6 +108,11 @@ class Listing(TimestampMixin, Base):
     vault_count: Mapped[int | None] = mapped_column(Integer)
     last_restock_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_restock_note: Mapped[str | None] = mapped_column(Text)
+    # Part of a cross-platform card: its vault settings come from the card.
+    group_id: Mapped[int | None] = mapped_column(
+        ForeignKey("listing_groups.id", ondelete="SET NULL"), index=True
+    )
+    device: Mapped[str | None] = mapped_column(String(20))
 
 
 class VaultUploadState(enum.StrEnum):

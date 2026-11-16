@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.v1 import (
     auth,
     combined,
+    listing_groups,
     listings,
     messages,
     notifications,
@@ -63,6 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(search.router)
     api.include_router(combined.router)
     api.include_router(timezones.router)
+    api.include_router(listing_groups.router)
     api.include_router(notifications.router)
     for router in platform.module_context.routers:
         api.include_router(router)

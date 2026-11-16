@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import utcnow
-from app.listings.models import Listing
+from app.listings.models import DEVICES, Listing
 from app.orders.models import Fulfilment, Order
 from app.stock.models import ItemState, StockItem, StockPool
 from app.stores.models import MarketplaceConnection, Store
@@ -136,6 +136,7 @@ async def _order(
     listing = await session.get(Listing, order.listing_id) if order.listing_id else None
     if listing is not None:
         values["listing"] = listing.title
+    values["platform"] = DEVICES.get(listing.device or "", "") if listing is not None else ""
     fulfilment = await session.scalar(select(Fulfilment).where(Fulfilment.order_id == order.id))
     per_unit = listing.units_per_sale if listing else 1
     accounts = fulfilment.units if fulfilment else order.quantity * per_unit
