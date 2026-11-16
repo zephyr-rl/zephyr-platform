@@ -140,7 +140,10 @@ jobs:
           $before = Get-Content C:\ZP\.env -Raw
           & "$env:RUNNER_TEMP\kit\scripts\install.ps1" -Root C:\ZP -NonInteractive
           if ((Get-Content C:\ZP\.env -Raw) -ne $before) { throw '.env changed on a second install.' }
-          & "$env:RUNNER_TEMP\kit\scripts\update.ps1" -Root C:\ZP
+          # With every output redirected, as when it runs over SSH.
+          & "$env:RUNNER_TEMP\kit\scripts\update.ps1" -Root C:\ZP *>&1 | ForEach-Object { "$_" }
+          if (Test-Path C:\ZP\run\stop) { throw 'UPDATE stopped half way.' }
+          (Invoke-WebRequest http://127.0.0.1:8600/api/v1/ready -UseBasicParsing).StatusCode
           & C:\ZP\scripts\stop.ps1 -Root C:\ZP
           Start-Sleep -Seconds 3
           if (Get-NetTCPConnection -LocalPort 8600 -State Listen -ErrorAction SilentlyContinue) { throw 'Still running after STOP.' }

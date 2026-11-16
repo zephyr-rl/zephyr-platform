@@ -58,6 +58,9 @@ function Get-Uv([string]$Root) {
 }
 
 function Sync-Python([string]$Root) {
+    # Native programs write progress to stderr; with output redirected (scheduled or remote runs)
+    # Windows PowerShell turns that into errors. Only the exit code decides here.
+    $ErrorActionPreference = 'Continue'
     $uv = Get-Uv $Root
     $env:UV_PYTHON_INSTALL_DIR = Join-Path $Root 'python'
     $env:UV_CACHE_DIR = Join-Path $Root 'cache'
@@ -71,6 +74,7 @@ function Sync-Python([string]$Root) {
 }
 
 function Invoke-Py([string]$Root, [string[]]$Arguments) {
+    $ErrorActionPreference = 'Continue'  # see Sync-Python: the exit code decides
     $py = Join-Path $Root 'venv\Scripts\python.exe'
     Push-Location (Join-Path $Root 'app\backend')
     try {

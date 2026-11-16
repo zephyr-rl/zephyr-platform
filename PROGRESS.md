@@ -286,6 +286,11 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
   here, so only the alert was silenced, not the "waiting" count. Now `chat_threads.no_reply_needed`
   is worked out on every scan (CONFIRM/CANCEL in any enabled language; a thanks on a delivered
   or completed order), also for threads of orders that are no longer scanned.
+- 2026-11-16: **Update over SSH stopped half way once** (platform down about a minute, no
+  data touched): with all output redirected, Windows PowerShell turned uv's progress lines
+  on stderr into errors after the platform was already stopped. Running UPDATE again brought
+  it back. The scripts now judge native programs by their exit code only, and CI runs UPDATE
+  with redirected output.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off
