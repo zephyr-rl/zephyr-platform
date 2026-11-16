@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AuthDep, OwnerDep, PlatformDep, SessionDep
+from app.core import audit
 from app.core.crypto import CryptoError
 from app.stock import service
+from app.stock.importer import parse
 from app.stock.models import ItemState, ItemType, StockExtraction, StockItem, StockPool
 from app.stores.service import NotFound as StoreNotFound
 from app.stores.service import get_store
@@ -44,6 +47,7 @@ class PoolOut(BaseModel):
     archived: bool
     counts: dict[str, int]
     low: bool
+    tokens: int  # available accounts with a token
 
 
 class ItemOut(BaseModel):
@@ -58,10 +62,49 @@ class ItemOut(BaseModel):
     state_changed_at: datetime
 
 
+class AccountOut(ItemOut):
+    """An item with its credentials (the pool view shows them, owner's choice)."""
+
+    login: str
+    password: str
+    token: str | None
+    extra: dict[str, str]
+    last_event: str | None
+
+
 class ItemsPage(BaseModel):
     items: list[ItemOut]
     total: int
     next_after: int | None
+
+
+class AccountsPage(BaseModel):
+    items: list[AccountOut]
+    total: int
+    offset: int
+    limit: int
+
+
+class ItemIdsIn(BaseModel):
+    item_ids: list[int] = Field(min_length=1, max_length=5000)
+    reason: str | None = Field(None, max_length=500)
+
+
+class ExportOut(BaseModel):
+    text: str
+    count: int
+
+
+class ConvertIn(BaseModel):
+    text: str = Field(min_length=1, max_length=service.MAX_IMPORT_CHARS)
+    with_token: bool = False
+
+
+class ConvertOut(BaseModel):
+    text: str
+    count: int
+    invalid_lines: list[int]
+    detected_format: str
 
 
 class ImportIn(BaseModel):
@@ -70,6 +113,8 @@ class ImportIn(BaseModel):
 
 class ImportCommitIn(ImportIn):
     expected_sha256: str = Field(min_length=64, max_length=64)
+    # Accounts taken out earlier in this panel come back into this pool.
+    put_back: bool = False
 
 
 class PreviewLineOut(BaseModel):
@@ -79,6 +124,7 @@ class PreviewLineOut(BaseModel):
     format: str
     has_token: bool
     token_will_attach: bool
+    where: str | None = None
 
 
 class PreviewOut(BaseModel):
@@ -164,7 +210,7 @@ def _fail(exc: Exception) -> HTTPException:
     return HTTPException(status.HTTP_409_CONFLICT, str(exc))
 
 
-def _pool_out(pool: StockPool, counts: dict[str, int] | None) -> PoolOut:
+def _pool_out(pool: StockPool, counts: dict[str, int] | None, tokens: int = 0) -> PoolOut:
     counts = counts or {s.value: 0 for s in ItemState}
     return PoolOut(
         id=pool.id,
@@ -175,7 +221,21 @@ def _pool_out(pool: StockPool, counts: dict[str, int] | None) -> PoolOut:
         archived=pool.archived,
         counts=counts,
         low=counts.get("available", 0) <= pool.low_stock_threshold,
+        tokens=tokens,
     )
+
+
+async def _token_counts(session: AsyncSession, store_id: int) -> dict[int, int]:
+    rows = await session.execute(
+        select(StockItem.pool_id, func.count())
+        .where(
+            StockItem.store_id == store_id,
+            StockItem.state == ItemState.available,
+            StockItem.has_token.is_(True),
+        )
+        .group_by(StockItem.pool_id)
+    )
+    return {pid: n for pid, n in rows}
 
 
 def _item_out(i: StockItem) -> ItemOut:
@@ -231,7 +291,8 @@ async def list_pools(store_id: int, auth: AuthDep, session: SessionDep) -> list[
         .order_by(StockPool.archived, StockPool.name)
     )
     counts = await service.pool_counts(session, store_id)
-    return [_pool_out(p, counts.get(p.id)) for p in pools]
+    tokens = await _token_counts(session, store_id)
+    return [_pool_out(p, counts.get(p.id), tokens.get(p.id, 0)) for p in pools]
 
 
 @router.post("/pools", response_model=PoolOut, status_code=status.HTTP_201_CREATED)
@@ -256,7 +317,8 @@ async def update_pool(
         raise _fail(exc) from None
     await session.commit()
     counts = await service.pool_counts(session, store_id)
-    return _pool_out(pool, counts.get(pool.id))
+    tokens = await _token_counts(session, store_id)
+    return _pool_out(pool, counts.get(pool.id), tokens.get(pool.id, 0))
 
 
 @router.get("/pools/{pool_id}/items", response_model=ItemsPage)
@@ -287,6 +349,155 @@ async def list_items(
         items=[_item_out(i) for i in rows],
         total=int(total or 0),
         next_after=rows[-1].position if more and rows else None,
+    )
+
+
+@router.get("/pools/{pool_id}/accounts", response_model=AccountsPage)
+async def list_accounts(
+    store_id: int,
+    pool_id: int,
+    auth: OwnerDep,
+    platform: PlatformDep,
+    session: SessionDep,
+    state: ItemState | Literal["all"] = ItemState.available,
+    q: str | None = Query(None, max_length=200, description="Words in the login, e-mail or token"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+) -> AccountsPage:
+    """The pool's accounts with their credentials, in delivery order."""
+    try:
+        pool = await service.get_pool(session, store_id, pool_id)
+    except service.StockError as exc:
+        raise _fail(exc) from None
+    base = select(StockItem).where(StockItem.pool_id == pool_id)
+    if state != "all":
+        base = base.where(StockItem.state == state)
+    ordered = base.order_by(StockItem.position, StockItem.id)
+    words = [w for w in (q or "").lower().split() if w]
+    try:
+        if words:
+            # Credentials are stored encrypted: a text search reads the whole pool.
+            everything = list((await session.scalars(ordered)).all())
+            revealed = await service.reveal(session, platform, everything)
+            hits = [
+                (i, r)
+                for i, r in zip(everything, revealed, strict=True)
+                if service.matches(r, words)
+            ]
+            total = len(hits)
+            page = hits[offset : offset + limit]
+        else:
+            total = int(
+                await session.scalar(select(func.count()).select_from(base.subquery())) or 0
+            )
+            rows = list((await session.scalars(ordered.offset(offset).limit(limit))).all())
+            page = list(zip(rows, await service.reveal(session, platform, rows), strict=True))
+    except CryptoError as exc:
+        raise _fail(exc) from None
+    last = await service.last_events(session, [i.id for i, _ in page])
+    audit.record(
+        session,
+        auth.actor,
+        "stock.viewed",
+        entity_type="stock_pool",
+        entity_id=pool.id,
+        store_id=store_id,
+        after={"count": len(page), "offset": offset, "search": bool(words)},
+    )
+    await session.commit()
+    return AccountsPage(
+        items=[
+            AccountOut(
+                **_item_out(i).model_dump(),
+                login=r.login,
+                password=r.password,
+                token=r.token,
+                extra=r.extra,
+                last_event=last.get(i.id),
+            )
+            for i, r in page
+        ],
+        total=total,
+        offset=offset,
+        limit=limit,
+    )
+
+
+@router.get("/pools/{pool_id}/export", response_model=ExportOut)
+async def export_pool(
+    store_id: int,
+    pool_id: int,
+    auth: OwnerDep,
+    platform: PlatformDep,
+    session: SessionDep,
+    format: str = Query("login_password", pattern="^(login_password|login_password_token|tokens)$"),
+) -> ExportOut:
+    """Copy all / Download .txt / Copy tokens. The accounts stay in stock."""
+    try:
+        pool = await service.get_pool(session, store_id, pool_id)
+        text, count = await service.export_pool(session, platform, auth.actor, pool, format)
+    except (service.StockError, CryptoError) as exc:
+        raise _fail(exc) from None
+    await session.commit()
+    return ExportOut(text=text, count=count)
+
+
+@router.delete("/pools/{pool_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_pool(store_id: int, pool_id: int, auth: OwnerDep, session: SessionDep) -> None:
+    try:
+        pool = await service.get_pool(session, store_id, pool_id)
+        await service.delete_pool(session, auth.actor, pool)
+        await session.flush()
+    except service.StockError as exc:
+        raise _fail(exc) from None
+    except IntegrityError:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Listings still use this pool: change them first."
+        ) from None
+    await session.commit()
+
+
+@router.post("/items/remove")
+async def remove_items(
+    store_id: int, body: ItemIdsIn, auth: OwnerDep, session: SessionDep
+) -> dict[str, int]:
+    try:
+        n = await service.remove_items(
+            session, auth.actor, store_id, body.item_ids, reason=body.reason
+        )
+    except service.StockError as exc:
+        raise _fail(exc) from None
+    await session.commit()
+    return {"removed": n}
+
+
+@router.post("/items/put-back")
+async def put_back(
+    store_id: int, body: ItemIdsIn, auth: OwnerDep, session: SessionDep
+) -> dict[str, int]:
+    try:
+        n = await service.put_back(session, auth.actor, store_id, body.item_ids)
+    except service.StockError as exc:
+        raise _fail(exc) from None
+    await session.commit()
+    return {"put_back": n}
+
+
+@router.post("/convert", response_model=ConvertOut)
+async def convert(store_id: int, body: ConvertIn, auth: OwnerDep) -> ConvertOut:
+    """Structured formatter: any supported format in, login:password[:token] lines out."""
+    parsed = parse(body.text)
+    lines = [
+        f"{a.login}:{a.password}:{a.token}"
+        if body.with_token and a.token
+        else f"{a.login}:{a.password}"
+        for a in parsed.accounts
+    ]
+    return ConvertOut(
+        text="\n".join(lines),
+        count=len(lines),
+        invalid_lines=parsed.invalid_lines,
+        detected_format=parsed.detected_format,
     )
 
 
@@ -336,6 +547,7 @@ async def commit_import(
             pool_id,
             body.text,
             expected_sha256=body.expected_sha256,
+            put_back=body.put_back,
         )
     except (service.StockError, CryptoError) as exc:
         raise _fail(exc) from None

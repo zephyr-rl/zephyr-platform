@@ -184,6 +184,7 @@ export interface StockPool {
   archived: boolean;
   counts: Record<ItemState, number>;
   low: boolean;
+  tokens: number;
 }
 
 export interface StockItem {
@@ -196,6 +197,21 @@ export interface StockItem {
   note: string | null;
   created_at: string;
   state_changed_at: string;
+}
+
+export interface StockAccount extends StockItem {
+  login: string;
+  password: string;
+  token: string | null;
+  extra: Record<string, string>;
+  last_event: string | null;
+}
+
+export interface AccountsPage {
+  items: StockAccount[];
+  total: number;
+  offset: number;
+  limit: number;
 }
 
 export interface ItemsPage {
@@ -212,10 +228,17 @@ export interface ImportPreview {
     line: number;
     login_hint: string;
     status:
-      "new" | "in_pool" | "in_other_pool" | "previously_removed" | "repeated";
+      | "new"
+      | "in_pool"
+      | "in_other_pool"
+      | "taken_out"
+      | "in_other_store"
+      | "previously_removed"
+      | "repeated";
     format: string;
     has_token: boolean;
     token_will_attach: boolean;
+    where: string | null;
   }[];
   invalid_lines: number[];
   ignored_lines: number[];

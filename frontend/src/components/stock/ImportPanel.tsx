@@ -19,9 +19,20 @@ const FORMAT_LABEL: Record<string, string> = {
 };
 
 /** Paste → preview (nothing saved) → confirm. */
-export function ImportPanel({ storeId, pool, onDone }: { storeId: number; pool: StockPool; onDone: () => void }) {
+export function ImportPanel({
+  storeId,
+  pool,
+  onDone,
+  initialText = "",
+}: {
+  storeId: number;
+  pool: StockPool;
+  onDone: () => void;
+  initialText?: string;
+}) {
   const queryClient = useQueryClient();
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
+  const [putBack, setPutBack] = useState(false);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
 
   const check = useMutation({
@@ -35,10 +46,10 @@ export function ImportPanel({ storeId, pool, onDone }: { storeId: number; pool: 
     try {
       const result = await api<{ id: number; counts: Record<string, number> }>(
         `/stores/${storeId}/stock/pools/${pool.id}/import`,
-        { method: "POST", body: { text, expected_sha256: preview.text_sha256 } },
+        { method: "POST", body: { text, expected_sha256: preview.text_sha256, put_back: putBack } },
       );
       await queryClient.invalidateQueries({ queryKey: ["stock", storeId] });
-      const added = result.counts.added ?? 0;
+      const added = (result.counts.added ?? 0) + (result.counts.put_back ?? 0);
       const tokens = result.counts.tokens_attached ?? 0;
       toast.success(`${plural(added, "account")} added to ${pool.name}`, {
         description: tokens ? `${plural(tokens, "token")} attached to accounts already in stock.` : undefined,
@@ -52,7 +63,18 @@ export function ImportPanel({ storeId, pool, onDone }: { storeId: number; pool: 
   };
 
   const counts = preview?.counts;
-  const skipped = counts ? counts.in_pool! + counts.in_other_pool! + counts.previously_removed! + counts.repeated! : 0;
+  const back = putBack ? (counts?.taken_out ?? 0) : 0;
+  const adding = (counts?.new ?? 0) + back;
+  const skipped = counts
+    ? counts.in_pool! +
+      counts.in_other_pool! +
+      counts.previously_removed! +
+      counts.repeated! +
+      (counts.in_other_store ?? 0) +
+      (counts.taken_out ?? 0) -
+      back
+    : 0;
+  const stores = [...new Set(preview?.lines.filter((l) => l.where).map((l) => l.where))];
 
   return (
     <Card title={`Import accounts into ${pool.name}`}>
@@ -84,9 +106,29 @@ export function ImportPanel({ storeId, pool, onDone }: { storeId: number; pool: 
               {skipped > 0 && <Badge tone="neutral">{skipped.toLocaleString()} skipped</Badge>}
               {counts.previously_removed! > 0 && <Badge tone="danger">{counts.previously_removed} sold or removed before</Badge>}
               {counts.in_other_pool! > 0 && <Badge tone="warning">{counts.in_other_pool} in another pool</Badge>}
+              {(counts.taken_out ?? 0) > 0 && <Badge tone="progress">{counts.taken_out} taken out earlier</Badge>}
+              {(counts.in_other_store ?? 0) > 0 && (
+                <Badge tone="danger">
+                  {counts.in_other_store} in stock in {stores.join(", ")}: move them from there
+                </Badge>
+              )}
               {counts.invalid! > 0 && <Badge tone="danger">{plural(counts.invalid!, "unreadable line")}</Badge>}
               {counts.tokens_attached! > 0 && <Badge tone="progress">{plural(counts.tokens_attached!, "token")} to attach</Badge>}
             </div>
+            {(counts.taken_out ?? 0) > 0 && (
+              <label className="flex items-start gap-2 rounded-md border border-line-strong p-3 text-[13px]">
+                <input
+                  type="checkbox"
+                  checked={putBack}
+                  onChange={(e) => setPutBack(e.target.checked)}
+                  className="mt-0.5 size-4 accent-accent"
+                />
+                <span>
+                  Put back {plural(counts.taken_out!, "account")} taken out earlier in this store (extracted, removed or
+                  moved to another store). Leave it off if they were sold.
+                </span>
+              </label>
+            )}
             {preview.invalid_lines.length > 0 && (
               <p className="text-[13px] text-danger">
                 Unreadable lines: {preview.invalid_lines.slice(0, 30).join(", ")}
@@ -120,17 +162,17 @@ export function ImportPanel({ storeId, pool, onDone }: { storeId: number; pool: 
             <div className="flex flex-wrap gap-2">
               <ConfirmDialog
                 trigger={
-                  <Button variant="primary" disabled={counts.new === 0 && counts.tokens_attached === 0}>
-                    Add {plural(counts.new!, "account")}
+                  <Button variant="primary" disabled={adding === 0 && counts.tokens_attached === 0}>
+                    Add {plural(adding, "account")}
                   </Button>
                 }
-                title={`Add ${plural(counts.new!, "account")} to ${pool.name}?`}
+                title={`Add ${plural(adding, "account")} to ${pool.name}?`}
                 description={
                   skipped > 0
                     ? `${skipped.toLocaleString()} lines are skipped because those accounts are already known in this store.`
                     : "They go to the end of the pool, after the accounts already in stock."
                 }
-                confirmLabel={`Add ${plural(counts.new!, "account")}`}
+                confirmLabel={`Add ${plural(adding, "account")}`}
                 onConfirm={commit}
               />
               <Button variant="ghost" onClick={() => setPreview(null)}>

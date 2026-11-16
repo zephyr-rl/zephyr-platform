@@ -129,7 +129,7 @@ async def test_duplicates_are_classified(session: AsyncSession, platform: Platfo
         "ALPHA:other\nbeta:2\ndelta:4\ndelta:4\n  Gamma :3",
     )
     assert [line.status for line in preview.lines] == [
-        "previously_removed",
+        "taken_out",  # extracted in this panel: can be put back on import
         "in_other_pool",
         "new",
         "repeated",
@@ -141,13 +141,20 @@ async def test_duplicates_are_classified(session: AsyncSession, platform: Platfo
     assert counts["added"] == 1
 
 
-async def test_same_login_can_exist_in_different_stores(
+async def test_same_login_in_two_stores_only_once_in_stock(
     session: AsyncSession, platform: Platform
 ) -> None:
     s1, s2 = await _store(session, platform, "one"), await _store(session, platform, "two")
     p1, p2 = await _pool(session, s1), await _pool(session, s2)
-    assert (await _import(session, platform, s1, p1.id, "shared:pw"))["added"] == 1
-    assert (await _import(session, platform, s2, p2.id, "shared:pw"))["added"] == 1
+    p1_id, p2_id = p1.id, p2.id
+    assert (await _import(session, platform, s1, p1_id, "shared:pw"))["added"] == 1
+    # In stock in the first store: refused in the second (it would be sold twice).
+    refused = await _import(session, platform, s2, p2_id, "shared:pw")
+    assert refused["added"] == 0 and refused["in_other_store"] == 1
+    # Taken out of the first store, it can go into the second one.
+    await service.extract(session, platform, ACTOR, s1, p1_id, 1)
+    await session.commit()
+    assert (await _import(session, platform, s2, p2_id, "shared:pw"))["added"] == 1
 
 
 async def test_reimport_attaches_missing_tokens(session: AsyncSession, platform: Platform) -> None:
@@ -291,7 +298,10 @@ async def test_move_within_and_across_stores(session: AsyncSession, platform: Pl
     other = await _pool(session, zephyr, "Other")
     target = await _pool(session, jewelry, "Affluenter 43 Drops")
     await _import(session, platform, zephyr, source.id, "mover1:p1:tok1\nmover2:p2\nmover3:p3")
-    await _import(session, platform, jewelry, target.id, "mover3:p3")  # already known there
+    # Refused there: it is in stock in Zephyr (an account is in stock in one store at a time).
+    assert (await _import(session, platform, jewelry, target.id, "mover3:p3"))[
+        "in_other_store"
+    ] == 1
     ids = list(
         await session.scalars(
             select(StockItem.id).where(StockItem.store_id == zephyr).order_by(StockItem.id)
@@ -301,12 +311,13 @@ async def test_move_within_and_across_stores(session: AsyncSession, platform: Pl
     assert await service.move_items(session, platform, ACTOR, zephyr, ids[:1], other.id) == {
         "moved": 1,
         "skipped": 0,
+        "sold_there": 0,
     }
     result = await service.move_items(
         session, platform, ACTOR, zephyr, ids, target.id, target_store_id=jewelry
     )
     await session.commit()
-    assert result == {"moved": 2, "skipped": 1}
+    assert result == {"moved": 3, "skipped": 0, "sold_there": 0}
 
     moved = await service.find_by_login(session, platform, jewelry, "mover1")
     assert moved is not None and moved.state is ItemState.available and moved.has_token
@@ -314,8 +325,8 @@ async def test_move_within_and_across_stores(session: AsyncSession, platform: Pl
     assert revealed.token == "tok1"
     source_item = await service.find_by_login(session, platform, zephyr, "mover1")
     assert source_item is not None and source_item.state is ItemState.extracted
-    kept = await service.find_by_login(session, platform, zephyr, "mover3")
-    assert kept is not None and kept.state is ItemState.available
+    gone = await service.find_by_login(session, platform, zephyr, "mover3")
+    assert gone is not None and gone.state is ItemState.extracted  # moved to Jewelry too
 
 
 # ---- API ---------------------------------------------------------------------------------

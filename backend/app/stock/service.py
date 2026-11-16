@@ -173,10 +173,12 @@ def _announce_level(session: AsyncSession, pool: StockPool, before: int, after: 
 class PreviewLine:
     line: int
     login_hint: str
-    status: str  # new | in_pool | in_other_pool | previously_removed | repeated
+    # new | in_pool | in_other_pool | taken_out | in_other_store | previously_removed | repeated
+    status: str
     format: str
     has_token: bool
     token_will_attach: bool = False
+    where: str | None = None  # the other store, for in_other_store
 
 
 @dataclass
@@ -195,10 +197,52 @@ class ImportPreview:
             "in_pool": c["in_pool"],
             "in_other_pool": c["in_other_pool"],
             "previously_removed": c["previously_removed"],
+            "taken_out": c["taken_out"],
+            "in_other_store": c["in_other_store"],
             "repeated": c["repeated"],
             "invalid": len(self.invalid_lines),
             "tokens_attached": sum(line.token_will_attach for line in self.lines),
         }
+
+
+# Taken out in this panel (extraction, "Remove", moved to another store): can come back.
+# Old-system history (legacy_extracted) stays blocked: those accounts may have been sold.
+PUT_BACK_EVENTS = frozenset({"extracted", "removed", "moved_out"})
+IN_STOCK = (ItemState.available, ItemState.reserved, ItemState.quarantined)
+
+
+async def last_events(session: AsyncSession, item_ids: list[int]) -> dict[int, str]:
+    if not item_ids:
+        return {}
+    latest = (
+        select(func.max(StockItemEvent.id))
+        .where(StockItemEvent.item_id.in_(item_ids))
+        .group_by(StockItemEvent.item_id)
+    )
+    rows = await session.execute(
+        select(StockItemEvent.item_id, StockItemEvent.event).where(StockItemEvent.id.in_(latest))
+    )
+    return {item_id: event for item_id, event in rows}
+
+
+async def in_other_stores(
+    session: AsyncSession, store_id: int, fingerprints: list[str]
+) -> dict[str, str]:
+    """Accounts in stock in another store (the fingerprint is the same in every store)."""
+    if not fingerprints:
+        return {}
+    from app.stores.models import Store
+
+    rows = await session.execute(
+        select(StockItem.fingerprint, Store.name)
+        .join(Store, Store.id == StockItem.store_id)
+        .where(
+            StockItem.store_id != store_id,
+            StockItem.fingerprint.in_(fingerprints),
+            StockItem.state.in_(IN_STOCK),
+        )
+    )
+    return {fp: name for fp, name in rows}
 
 
 def text_digest(text: str) -> str:
@@ -232,6 +276,8 @@ async def _analyse(
             )
         )
         existing = {fp: (pid, st, tok, iid) for fp, pid, st, tok, iid in rows}
+    last = await last_events(session, [v[3] for v in existing.values()])
+    elsewhere = await in_other_stores(session, pool.store_id, list(set(fingerprints)))
 
     new: list[tuple[ParsedAccount, str]] = []
     seen: set[str] = set()
@@ -248,8 +294,14 @@ async def _analyse(
                 line.token_will_attach = bool(
                     account.token and not has_token and state is ItemState.available
                 )
+            elif fp in elsewhere:  # taken out here, now in stock in another store
+                line.status, line.where = "in_other_store", elsewhere[fp]
+            elif state is ItemState.extracted and last.get(existing[fp][3]) in PUT_BACK_EVENTS:
+                line.status = "taken_out"  # taken out in this panel: can be put back
             else:
-                line.status = "previously_removed"
+                line.status = "previously_removed"  # sold, removed for good, or old history
+        elif fp in elsewhere:
+            line.status, line.where = "in_other_store", elsewhere[fp]
         else:
             new.append((account, fp))
         seen.add(fp)
@@ -292,8 +344,10 @@ async def commit_import(
     text: str,
     *,
     expected_sha256: str,
+    put_back: bool = False,
 ) -> tuple[StockImport, ImportPreview]:
-    """Save what the preview showed. Refuses if the text changed since the preview."""
+    """Save what the preview showed. Refuses if the text changed since the preview.
+    ``put_back``: accounts taken out earlier in this panel come back into this pool."""
     if text_digest(text) != expected_sha256:
         raise StockError("The text changed after the preview. Preview it again.")
     pool = await get_pool(session, store_id, pool_id, lock=True)
@@ -349,7 +403,17 @@ async def commit_import(
     )
 
     tokens_attached = await _attach_tokens_to_existing(session, platform, pool, preview, text)
-    counts = {**preview.counts, "added": len(added), "tokens_attached": tokens_attached}
+    restored = 0
+    if put_back and preview.counts["taken_out"]:
+        restored = await _put_back_from_text(
+            session, platform, actor, pool, preview, text, record.id
+        )
+    counts = {
+        **preview.counts,
+        "added": len(added),
+        "tokens_attached": tokens_attached,
+        "put_back": restored,
+    }
     record.counts = counts
     audit.record(
         session,
@@ -360,14 +424,81 @@ async def commit_import(
         store_id=store_id,
         after={"import_id": record.id, **counts},
     )
-    if added:
+    if added or restored:
         events.publish(
             session,
             "stock.imported",
-            {"pool_id": pool.id, "pool": pool.name, "added": len(added), "import_id": record.id},
+            {
+                "pool_id": pool.id,
+                "pool": pool.name,
+                "added": len(added) + restored,
+                "import_id": record.id,
+            },
             store_id=store_id,
         )
     return record, preview
+
+
+async def _revive(
+    session: AsyncSession,
+    platform: Platform,
+    item: StockItem,
+    pool: StockPool,
+    account: ParsedAccount,
+    position: int,
+    state: ItemState = ItemState.available,
+) -> None:
+    """An account taken out earlier comes back (same row: its history stays in one place)."""
+    item.pool_id, item.position, item.state = pool.id, position, state
+    item.payload_encrypted = _encrypt_item(platform, item.store_id, account)
+    if account.token and not item.has_token:
+        item.has_token = True
+        await _add_tokens(session, platform, item.store_id, [(item.id, account.token)])
+
+
+async def _put_back_from_text(
+    session: AsyncSession,
+    platform: Platform,
+    actor: audit.Actor,
+    pool: StockPool,
+    preview: ImportPreview,
+    text: str,
+    import_id: int,
+) -> int:
+    # (Lines in stock in another store are "in_other_store", never "taken_out".)
+    wanted = {line.line for line in preview.lines if line.status == "taken_out"}
+    accounts = [a for a in parse(text).accounts if a.line in wanted]
+    by_fp = {platform.fingerprints(normalise_login(a.login)): a for a in accounts}
+    items = list(
+        await session.scalars(
+            select(StockItem).where(
+                StockItem.store_id == pool.store_id,
+                StockItem.fingerprint.in_(list(by_fp)),
+                StockItem.state == ItemState.extracted,
+            )
+        )
+    )
+    last = await last_events(session, [i.id for i in items])
+    position = await _next_position(session, pool.id)
+    done = 0
+    for item in items:
+        if last.get(item.id) not in PUT_BACK_EVENTS:
+            continue
+        await _revive(session, platform, item, pool, by_fp[item.fingerprint], position)
+        session.add(
+            StockItemEvent(
+                item_id=item.id,
+                actor_label=actor.label,
+                event="put_back",
+                from_state="extracted",
+                to_state="available",
+                batch=f"import:{import_id}",
+                details={"to_pool": pool.id},
+            )
+        )
+        position += 1
+        done += 1
+    return done
 
 
 async def _add_tokens(
@@ -721,7 +852,7 @@ async def move_items(
     sources = {i.pool_id for i in items}
     before = {pid: await _available(session, pid) for pid in sources}
     position = await _next_position(session, target.id)
-    moved = skipped = 0
+    moved = skipped = conflicts = 0
 
     if target_store_id == store_id:
         for item in items:
@@ -774,10 +905,25 @@ async def move_items(
                 .on_conflict_do_nothing(index_elements=["store_id", "fingerprint"])
                 .returning(StockItem.id)
             )
-            if new_id is None:  # already known in the target store (maybe sold there): keep here
-                skipped += 1
-                continue
-            await _add_tokens(session, platform, target_store_id, [(new_id, r.token)])
+            if new_id is None:
+                # Already known in the target store. Taken out there earlier (by hand, moved
+                # away, or old history while it was in this store): it comes back. Sold or
+                # still in stock there: it stays here.
+                there = await session.scalar(
+                    select(StockItem).where(
+                        StockItem.store_id == target_store_id,
+                        StockItem.fingerprint == item.fingerprint,
+                    )
+                )
+                if there is None or there.state is not ItemState.extracted:
+                    skipped += 1
+                    if there is not None and there.state is ItemState.delivered:
+                        conflicts += 1
+                    continue
+                await _revive(session, platform, there, target, account, position, item.state)
+                new_id = there.id
+            else:
+                await _add_tokens(session, platform, target_store_id, [(new_id, r.token)])
             session.add_all(
                 [
                     StockItemEvent(
@@ -814,9 +960,14 @@ async def move_items(
         entity_type="stock_pool",
         entity_id=target.id,
         store_id=store_id,
-        after={"moved": moved, "skipped": skipped, "target_store": target_store_id},
+        after={
+            "moved": moved,
+            "skipped": skipped,
+            "sold_there": conflicts,
+            "target_store": target_store_id,
+        },
     )
-    return {"moved": moved, "skipped": skipped}
+    return {"moved": moved, "skipped": skipped, "sold_there": conflicts}
 
 
 async def find_by_login(
@@ -838,3 +989,156 @@ async def item_history(session: AsyncSession, item_id: int) -> list[StockItemEve
             )
         ).all()
     )
+
+
+# ---- removing and putting back, export, search -------------------------------------------
+
+
+async def remove_items(
+    session: AsyncSession,
+    actor: audit.Actor,
+    store_id: int,
+    item_ids: list[int],
+    *,
+    reason: str | None = None,
+) -> int:
+    """Take accounts out of sale by hand. Not deleted: they can be put back."""
+    items = await _load_items(session, store_id, item_ids)
+    wrong = [i for i in items if i.state not in (ItemState.available, ItemState.quarantined)]
+    if wrong:
+        raise StockError(f"{len(wrong)} selected accounts are not available or quarantined.")
+    pools = {i.pool_id for i in items}
+    before = {pid: await _available(session, pid) for pid in pools}
+    batch = f"remove:{secrets.token_hex(6)}"
+    for item in items:
+        session.add(
+            StockItemEvent(
+                item_id=item.id,
+                actor_label=actor.label,
+                event="removed",
+                from_state=item.state.value,
+                to_state="extracted",
+                batch=batch,
+                details={"reason": reason} if reason else None,
+            )
+        )
+        item.state = ItemState.extracted
+    await session.flush()
+    for pid in pools:
+        pool = await session.get(StockPool, pid)
+        assert pool is not None
+        _announce_level(session, pool, before[pid], await _available(session, pid))
+    audit.record(
+        session,
+        actor,
+        "stock.items_removed",
+        entity_type="stock_items",
+        entity_id=batch,
+        store_id=store_id,
+        after={"count": len(items), "item_ids": item_ids[:200]},
+        reason=reason,
+    )
+    return len(items)
+
+
+async def put_back(
+    session: AsyncSession, actor: audit.Actor, store_id: int, item_ids: list[int]
+) -> int:
+    """Undo "Remove": the accounts are available again in their pool."""
+    items = await _load_items(session, store_id, item_ids)
+    last = await last_events(session, [i.id for i in items])
+    wrong = [i for i in items if i.state is not ItemState.extracted or last.get(i.id) != "removed"]
+    if wrong:
+        raise StockError(
+            f"{len(wrong)} selected accounts were not removed by hand; "
+            "undo an extraction from the extraction history instead."
+        )
+    batch = f"putback:{secrets.token_hex(6)}"
+    for item in items:
+        item.state = ItemState.available
+        session.add(
+            StockItemEvent(
+                item_id=item.id,
+                actor_label=actor.label,
+                event="put_back",
+                from_state="extracted",
+                to_state="available",
+                batch=batch,
+            )
+        )
+    audit.record(
+        session,
+        actor,
+        "stock.items_put_back",
+        entity_type="stock_items",
+        entity_id=batch,
+        store_id=store_id,
+        after={"count": len(items), "item_ids": item_ids[:200]},
+    )
+    return len(items)
+
+
+EXPORT_FORMATS = ("login_password", "login_password_token", "tokens")
+
+
+async def export_pool(
+    session: AsyncSession,
+    platform: Platform,
+    actor: audit.Actor,
+    pool: StockPool,
+    fmt: str,
+) -> tuple[str, int]:
+    """The pool's available accounts as text. They stay in stock (use Extract to take them out)."""
+    if fmt not in EXPORT_FORMATS:
+        raise StockError("Unknown format.")
+    items = list(
+        await session.scalars(
+            select(StockItem)
+            .where(StockItem.pool_id == pool.id, StockItem.state == ItemState.available)
+            .order_by(StockItem.position, StockItem.id)
+        )
+    )
+    revealed = await reveal(session, platform, items)
+    if fmt == "tokens":
+        lines = [r.token for r in revealed if r.token]
+    elif fmt == "login_password_token":
+        lines = [f"{r.line()}:{r.token}" if r.token else r.line() for r in revealed]
+    else:
+        lines = [r.line() for r in revealed]
+    audit.record(
+        session,
+        actor,
+        "stock.exported",
+        entity_type="stock_pool",
+        entity_id=pool.id,
+        store_id=pool.store_id,
+        after={"format": fmt, "count": len(lines)},
+    )
+    return "\n".join(lines), len(lines)
+
+
+def matches(r: RevealedItem, words: list[str]) -> bool:
+    text = " ".join(
+        [r.login, r.token or "", r.extra.get("email", ""), r.extra.get("email_provider", "")]
+    ).lower()
+    return all(w in text for w in words)
+
+
+async def delete_pool(session: AsyncSession, actor: audit.Actor, pool: StockPool) -> None:
+    """Only a pool that never had accounts can be deleted; any other is archived."""
+    used = await session.scalar(select(func.count()).where(StockItem.pool_id == pool.id))
+    if used:
+        raise StockError(
+            "This pool has accounts or their history: archive it instead "
+            "(the history keeps those accounts from being sold twice)."
+        )
+    audit.record(
+        session,
+        actor,
+        "stock.pool_deleted",
+        entity_type="stock_pool",
+        entity_id=pool.id,
+        store_id=pool.store_id,
+        before={"name": pool.name, "game": pool.game},
+    )
+    await session.delete(pool)

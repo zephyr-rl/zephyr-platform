@@ -357,6 +357,28 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     switch is gone and the API refuses to turn it off.
   - Automation now says "settings for <store>": messages and settings are per store. Cards no
     longer stretch to the height of their neighbour (Reports was very tall).
+- 2026-11-16: **Stock rebuilt as the old Account Manager** (owner's choices: credentials always
+  visible, "Remove" instead of delete, export keeps accounts in stock with a warning).
+  - Layout: pools on the left (game filter with totals, available count, ⚿ tokens, New pool,
+    archived on demand), the selected pool on the right; /stock opens the first pool.
+  - Top bar: Undo last extraction (pool and count), Convert format (structured blocks →
+    login:password[:token], copy or import into the pool), Extraction history (all, by pool,
+    view accounts, undo), Find a login (exact, every pool, history included).
+  - Pool: Import, Extract, Copy all, Download .txt, Copy tokens, Settings (rename, game, alert,
+    archive; delete only if it never had accounts). Table with login, password, token and
+    e-mail always shown, copy buttons, search by login / e-mail / token (the server decrypts
+    the pool in memory; nothing stored in plain), state filter, 25/50/100/250 per page with
+    "1 / N", History, Remove / Put back, bulk Quarantine / Release / Move to pool / Move to
+    store / Put back. Every view and export of credentials is in the audit log.
+  - **Moving between stores without conflicts**: an account is in stock in one store at a
+    time (the same fingerprint everywhere). Moving A→B→A brings back the old row in A
+    (history kept in one place); accounts sold in the target store are kept in the source.
+    Import: accounts in stock in another store are refused ("move them from there"); accounts
+    taken out earlier in this panel (extracted, removed, moved away) can be put back with a
+    checkbox; sold, voided and old-system history stay blocked. Checked on the server: no
+    account is in stock in two stores today.
+  - API: `/pools/{id}/accounts`, `/pools/{id}/export`, `DELETE /pools/{id}`, `/items/remove`,
+    `/items/put-back`, `/convert`; import commit `put_back`; pool `tokens`.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off
