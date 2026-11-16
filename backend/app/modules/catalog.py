@@ -32,6 +32,7 @@ class DeliveriesSettings(_Settings):
     auto_deliver: bool = Field(
         True,
         description="Turn off to hold every automatic listing for your approval (kill switch).",
+        json_schema_extra={"ui": "hidden"},  # the switch is in Listings
     )
     message_template: str = Field(
         DEFAULT_DELIVERY_MESSAGE,
@@ -79,12 +80,6 @@ class DeliveriesSettings(_Settings):
 class RestockSettings(_Settings):
     interval_minutes: int = Field(
         1, ge=1, le=1440, description="How often the vault of each listing is checked."
-    )
-    target_quantity: int = Field(
-        1,
-        ge=1,
-        le=100,
-        description="Accounts kept in the vault for listings without their own target.",
     )
 
 
@@ -197,10 +192,6 @@ class ReportsSettings(_Settings):
     )
 
 
-class AccountCheckSettings(_Settings):
-    pass
-
-
 @dataclass
 class DeclaredModule:
     key: str
@@ -209,6 +200,10 @@ class DeclaredModule:
     settings_schema: type[BaseModel]
     requires: frozenset[Capability] = field(default_factory=frozenset)
     default_enabled: bool = False
+    # Cannot be turned off (other modules depend on it).
+    always_on: bool = False
+    # Managed on another page of the panel (not listed in Automation).
+    managed_in: str | None = None
 
     def register(self, ctx: ModuleContext) -> None:
         return None
@@ -293,6 +288,7 @@ V1_MODULES: tuple[DeclaredModule, ...] = (
         DeliveriesSettings,
         frozenset({Capability.ORDERS, Capability.DELIVER}),
         default_enabled=True,
+        always_on=True,
     ),
     RestockModule(
         "restock",
@@ -300,6 +296,7 @@ V1_MODULES: tuple[DeclaredModule, ...] = (
         "Keeps the vault of instant-delivery listings stocked from their pools.",
         RestockSettings,
         frozenset({Capability.OFFERS, Capability.VAULT}),
+        managed_in="listings",
     ),
     DeclaredModule(
         "topups",
@@ -307,6 +304,7 @@ V1_MODULES: tuple[DeclaredModule, ...] = (
         "Sends your instructions when a top-up is paid and lists the top-ups waiting for you.",
         TopUpsSettings,
         frozenset({Capability.ORDERS, Capability.CHAT}),
+        managed_in="listings",
     ),
     ReviewRemindersModule(
         "review_reminders",
@@ -331,12 +329,6 @@ V1_MODULES: tuple[DeclaredModule, ...] = (
         ReportsSettings,
         frozenset({Capability.ORDERS}),
         default_enabled=True,
-    ),
-    DeclaredModule(
-        "account_check",
-        "Account check",
-        "Checks the inventory of stocked accounts.",
-        AccountCheckSettings,
     ),
 )
 

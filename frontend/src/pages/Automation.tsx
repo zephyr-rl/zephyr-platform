@@ -32,6 +32,7 @@ function SettingField({
 }) {
   const label = schema.title ?? name;
   const hint = schema.description;
+  if (schema.ui === "hidden") return null; // set elsewhere (Listings)
   if (schema.ui === "listings") {
     const count = Array.isArray(value) ? value.length : value && typeof value === "object" ? Object.keys(value).length : 0;
     return (
@@ -111,7 +112,7 @@ function SettingField({
 function ModuleCard({ storeId, storeName, module }: { storeId: number; storeName: string; module: StoreModule }) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft>(module.settings);
-  const properties = Object.entries(module.settings_schema.properties ?? {});
+  const properties = Object.entries(module.settings_schema.properties ?? {}).filter(([, p]) => p.ui !== "hidden");
   const dirty = JSON.stringify(draft) !== JSON.stringify(module.settings);
 
   useEffect(() => setDraft(module.settings), [module.settings]);
@@ -175,12 +176,14 @@ function ModuleCard({ storeId, storeName, module }: { storeId: number; storeName
         </span>
       }
       actions={
-        <Switch
-          checked={module.enabled}
-          disabled={save.isPending || (!module.available && !module.enabled)}
-          onCheckedChange={toggle}
-          label={`${module.name} for ${storeName}`}
-        />
+        module.always_on ? undefined : (
+          <Switch
+            checked={module.enabled}
+            disabled={save.isPending || (!module.available && !module.enabled)}
+            onCheckedChange={toggle}
+            label={`${module.name} for ${storeName}`}
+          />
+        )
       }
     >
       <div className="flex flex-col gap-4 p-4">
@@ -223,10 +226,13 @@ export function AutomationPage() {
   return (
     <>
       <div>
-        <h1 className="text-[22px] font-semibold">Automation</h1>
+        <h1 className="text-[22px] font-semibold">
+          Automation{store && <span className="text-muted"> · settings for {store.name}</span>}
+        </h1>
         <p className="mt-1 text-muted">
-          Switch modules on or off for {store ? <strong className="text-fg">{store.name}</strong> : "this store"}.
-          Each store has its own switches and settings.
+          Each store has its own messages and settings: changing them here only affects{" "}
+          {store ? <strong className="text-fg">{store.name}</strong> : "this store"}. Restock, top-ups and the
+          automatic deliveries switch are in Listings.
         </p>
       </div>
       {!store && (
@@ -234,9 +240,9 @@ export function AutomationPage() {
           <EmptyState title="No store selected" />
         </Card>
       )}
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid items-start gap-4 xl:grid-cols-2">
         {store &&
-          modules.data?.map((m) => <ModuleCard key={m.key} storeId={store.id} storeName={store.name} module={m} />)}
+          modules.data?.filter((m) => !m.managed_in).map((m) => <ModuleCard key={m.key} storeId={store.id} storeName={store.name} module={m} />)}
       </div>
     </>
   );

@@ -1,6 +1,7 @@
 """Import an old store's restock setup (restock_config.json, read-only).
 
-- Global switch, check interval and default target → the Restock module of the store.
+- Global switch and check interval → the Restock module of the store. (The old default target
+  is only used for cards and offers without their own; there is no store default here: 1.)
 - ``crossPlatformGroups`` → cross-platform cards (pool, target, on/off, extra text, e-mail
   details, the PC / PlayStation / Xbox offers). Offers not synced yet are attached later, by
   "Read offers from marketplace".
@@ -83,11 +84,9 @@ async def migrate_restock(
         store_id,
         "restock",
         enabled=bool(cfg.get("enabled")),
-        settings={"interval_minutes": interval, "target_quantity": target},
+        settings={"interval_minutes": interval},
     )
-    report.module = (
-        f"{'on' if cfg.get('enabled') else 'off'}, every {interval} min, default target {target}"
-    )
+    report.module = f"{'on' if cfg.get('enabled') else 'off'}, every {interval} min"
 
     # 2. Cross-platform cards.
     for legacy_id, g in (cfg.get("crossPlatformGroups") or {}).items():

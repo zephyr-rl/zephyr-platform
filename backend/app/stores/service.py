@@ -251,6 +251,11 @@ async def set_module(
     await session.refresh(row, with_for_update=True)
     if expected_version is not None and expected_version != row.version:
         raise StoreError("These settings were changed elsewhere. Reload and try again.")
+    if enabled is False and module.always_on:
+        raise StoreError(
+            f"{module.name} is always on. To hold automatic deliveries, use the "
+            "“Automatic deliveries” switch in Listings."
+        )
 
     before = {"enabled": row.enabled, "settings": row.settings, "version": row.version}
     if settings is not None:

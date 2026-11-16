@@ -25,6 +25,11 @@ import {
 } from "@/lib/api";
 import { CrossPlatformCards } from "@/components/listings/CrossPlatformCards";
 import { ItemCard, TopupCard } from "@/components/listings/OfferCards";
+import {
+  DeliveriesSwitch,
+  RestockSwitch,
+  TopupsSwitch,
+} from "@/components/listings/StoreSwitches";
 import { useStores } from "@/lib/session";
 import { plural } from "@/lib/stock";
 
@@ -444,7 +449,7 @@ function EditListing({
               <div className="flex flex-wrap items-end gap-4">
                 <TextField
                   label="Accounts kept in the vault"
-                  hint={`Empty: the store default (${restock.defaultTarget}).`}
+                  hint="Empty: 1."
                   type="number"
                   min={1}
                   max={100}
@@ -605,80 +610,6 @@ const TABS: { key: Tab; label: string; kind: Listing["kind"] }[] = [
   { key: "topups", label: "Top-ups", kind: "topup" },
 ];
 
-function RestockMaster({
-  storeId,
-  module,
-  shadow,
-}: {
-  storeId: number;
-  module?: StoreModule;
-  shadow: boolean;
-}) {
-  const queryClient = useQueryClient();
-  const set = useMutation({
-    mutationFn: (enabled: boolean) =>
-      api<StoreModule>(`/stores/${storeId}/modules/restock`, {
-        method: "PUT",
-        body: { enabled, expected_version: module?.version },
-      }),
-    onSuccess: async (m) => {
-      await queryClient.invalidateQueries({
-        queryKey: ["stores", storeId, "modules"],
-      });
-      toast.success(
-        m.enabled ? "Automatic restock on" : "Automatic restock off",
-        {
-          description: m.enabled
-            ? shadow
-              ? "Shadow mode: the uploads are only recorded."
-              : "The vaults are topped up from the stock pools."
-            : "Nothing is uploaded until you turn it on again. The vaults keep what they have.",
-        },
-      );
-    },
-    onError: (e) =>
-      toast.error("Could not change the restock", { description: e.message }),
-  });
-  if (!module) return null;
-  const every = Number(module.settings.interval_minutes ?? 1);
-  const label = (
-    <span className="text-[13px]">
-      Automatic restock{" "}
-      <span className={module.enabled ? "text-success" : "text-muted"}>
-        {module.enabled ? `on · every ${every} min` : "off"}
-      </span>
-    </span>
-  );
-  if (module.enabled || shadow)
-    return (
-      <div className="flex items-center gap-2 rounded-md border border-line-strong px-3 py-1.5">
-        {label}
-        <Switch
-          checked={module.enabled}
-          disabled={set.isPending}
-          onCheckedChange={(v) => set.mutate(v)}
-          label="Automatic restock"
-        />
-      </div>
-    );
-  return (
-    <div className="flex items-center gap-2 rounded-md border border-line-strong px-3 py-1.5">
-      {label}
-      <ConfirmDialog
-        trigger={
-          <Button size="sm" variant="primary">
-            Turn on
-          </Button>
-        }
-        title="Turn on automatic restock?"
-        description="Every vault with restock on (cards and single offers) is topped up from its stock pool. Uploaded accounts are sent to Eldorado and leave the stock for good."
-        confirmLabel="Turn on restock"
-        onConfirm={() => set.mutateAsync(true)}
-      />
-    </div>
-  );
-}
-
 const normalize = (t: string) =>
   t
     .toLowerCase()
@@ -714,9 +645,10 @@ export function ListingsPage() {
   });
   const restockModule = modules.data?.find((m) => m.key === "restock");
   const topupsModule = modules.data?.find((m) => m.key === "topups");
+  const deliveriesModule = modules.data?.find((m) => m.key === "deliveries");
   const restock: RestockInfo = {
     enabled: restockModule?.enabled ?? false,
-    defaultTarget: Number(restockModule?.settings.target_quantity ?? 1),
+    defaultTarget: 1, // no store default: a listing without its own target keeps 1
   };
   const sync = useMutation({
     mutationFn: () =>
@@ -777,10 +709,22 @@ export function ListingsPage() {
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-3">
+          <DeliveriesSwitch
+            storeId={storeId}
+            module={deliveriesModule}
+            shadow={store.shadow_mode}
+          />
           {tab === "accounts" && (
-            <RestockMaster
+            <RestockSwitch
               storeId={storeId}
               module={restockModule}
+              shadow={store.shadow_mode}
+            />
+          )}
+          {tab === "topups" && (
+            <TopupsSwitch
+              storeId={storeId}
+              module={topupsModule}
               shadow={store.shadow_mode}
             />
           )}
@@ -907,16 +851,6 @@ export function ListingsPage() {
             </div>
           )}
         </Card>
-      )}
-      {tab === "topups" && topupsModule && !topupsModule.enabled && (
-        <p className="text-[13px] text-warning">
-          The Top-Ups module is off for this store: no instructions are sent
-          until you turn it on in{" "}
-          <Link to="/automation" className="underline">
-            Automation
-          </Link>
-          .
-        </p>
       )}
 
       {tab === "accounts" && (

@@ -86,6 +86,8 @@ class ModuleOut(BaseModel):
     settings: dict[str, Any]
     settings_schema: dict[str, Any]
     version: int
+    always_on: bool
+    managed_in: str | None
 
 
 class ModulePut(BaseModel):
@@ -214,6 +216,8 @@ def _module_out(state: service.ModuleState) -> ModuleOut:
         settings=state.row.settings,
         settings_schema=state.module.settings_schema.model_json_schema(),
         version=state.row.version,
+        always_on=state.module.always_on,
+        managed_in=state.module.managed_in,
     )
 
 

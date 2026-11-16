@@ -94,7 +94,6 @@ async def _restock_settings(session: SessionDep, store_id: int) -> tuple[bool, R
 
 
 async def _out(session: SessionDep, store_id: int, items: list[ListingGroup]) -> list[GroupOut]:
-    _, settings = await _restock_settings(session, store_id)
     pools = {
         p.id: p.name
         for p in await session.scalars(select(StockPool).where(StockPool.store_id == store_id))
@@ -144,7 +143,7 @@ async def _out(session: SessionDep, store_id: int, items: list[ListingGroup]) ->
                 pool_available=available.get(g.pool_id, 0) if g.pool_id else None,
                 restock_enabled=g.restock_enabled,
                 restock_target=g.restock_target,
-                effective_target=g.restock_target or settings.target_quantity,
+                effective_target=g.restock_target or 1,
                 auto_resume=g.auto_resume,
                 vault_additional_info=g.vault_additional_info,
                 include_email_details=g.include_email_details,

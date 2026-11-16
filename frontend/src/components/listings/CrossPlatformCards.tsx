@@ -375,7 +375,7 @@ function EditCard({
             type="number"
             min={1}
             max={100}
-            placeholder={`Store default: ${defaultTarget}`}
+            placeholder={`Default: ${defaultTarget}`}
             value={target}
             onChange={(e) => setTarget(e.target.value)}
           />

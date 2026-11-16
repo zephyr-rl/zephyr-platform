@@ -345,6 +345,18 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     switch, own or general message, "N wait for you" linking to Orders filtered to that offer.
   - Listings store the offer's platform (Eldorado `tradeEnvironmentValues`); the listings API
     returns `platform` and `orders_need_you`; `GET /orders?listing_id=`.
+- 2026-11-16: **Automation trimmed, switches moved to Listings** (owner's decisions).
+  - Removed: Account check (it did nothing). Restock and Top-Ups are no longer listed in
+    Automation (`managed_in="listings"`); they still run as modules.
+  - Listings header: "Automatic deliveries" (the Deliveries kill switch, every tab), on
+    Accounts "Automatic restock" with the check interval (1-60 min), on Top-ups "Top-up
+    instructions" and "General message". Turning any of them on in a live store asks first.
+  - Restock has no store default target any more: a card or offer without its own keeps 1
+    (migration strips `target_quantity`; imported cards keep their 5 or 2).
+  - Deliveries is always on (orders feed reports, top-ups, chat monitor and reminders): its
+    switch is gone and the API refuses to turn it off.
+  - Automation now says "settings for <store>": messages and settings are per store. Cards no
+    longer stretch to the height of their neighbour (Reports was very tall).
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

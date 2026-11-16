@@ -134,6 +134,8 @@ export interface StoreModule {
   settings: Record<string, unknown>;
   settings_schema: ModuleSchema;
   version: number;
+  always_on: boolean;
+  managed_in: string | null;
 }
 
 export interface SessionInfo {

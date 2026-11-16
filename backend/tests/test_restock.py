@@ -184,15 +184,17 @@ async def test_email_details_are_sent_only_when_asked(session: AsyncSession, vau
     assert entry.email == "mail1@example.com" and entry.email_password == "mailpass1"
 
 
-async def test_store_default_target(
+async def test_listing_without_target_keeps_one(
     session: AsyncSession, vault: Vault, platform: Platform
 ) -> None:
+    # There is no store default any more: a listing without its own target keeps 1.
     await vault.setup(session, target=None)
-    await stores.set_module(
-        session, platform, ACTOR, vault.store_id, "restock", settings={"target_quantity": 2}
-    )
-    await session.commit()
-    assert (await vault.run()).uploaded == 2
+    result = await vault.run()
+    assert result.uploaded == 1 and result.target == 1
+    with pytest.raises(stores.StoreError):  # the old setting is refused
+        await stores.set_module(
+            session, platform, ACTOR, vault.store_id, "restock", settings={"target_quantity": 2}
+        )
 
 
 async def test_empty_pool_is_reported(session: AsyncSession, vault: Vault) -> None:

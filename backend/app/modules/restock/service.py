@@ -179,9 +179,8 @@ async def _pass(platform: Platform, listing_id: int) -> ListingResult:
         store = await session.get(Store, listing.store_id)
         connection = await session.get(MarketplaceConnection, listing.connection_id)
         assert store is not None and connection is not None
-        settings = await settings_for(session, store.id)
         result.shadow = store.shadow_mode
-        result.target = listing.restock_target or settings.target_quantity
+        result.target = listing.restock_target or 1  # a listing without its own target keeps 1
         connector = await open_connector(session, platform, connection)
         try:
             await _run(session, platform, connector, listing, result)

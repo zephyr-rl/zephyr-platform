@@ -215,7 +215,7 @@ async def test_legacy_restock_import(
     report = await migrate_restock(session, platform, ACTOR, folder=tmp_path, store_id=store_id)
     assert report.waiting_offers == ["🔥Black Neural Network & 6 Cases / Xbox"]
     assert report.manual_only == 1 and report.presets_skipped == 1
-    assert report.module == "on, every 1 min, default target 1"
+    assert report.module == "on, every 1 min"
     card = await session.scalar(select(ListingGroup))
     assert card is not None and card.pool_id == pool_id and card.restock_target == 5
     assert card.devices == {"pc": "off-pc", "playstation": "off-ps", "xbox": "off-xb"}
@@ -246,3 +246,24 @@ async def test_legacy_restock_import(
     assert again.cards_updated == ["🔥Black Neural Network & 6 Cases"] and not again.waiting_offers
     assert await session.scalar(select(func.count()).select_from(ListingGroup)) == 1
     assert await session.scalar(select(func.count()).select_from(StockPool)) == 1
+
+
+async def test_module_flags_and_deliveries_always_on(
+    auth_client, session: AsyncSession, platform: Platform, market: FakeMarketplace
+) -> None:  # type: ignore[no-untyped-def]
+    store_id, *_ = await _setup(session, platform, market, accounts=1)
+    mods = {
+        m["key"]: m for m in (await auth_client.get(f"/api/v1/stores/{store_id}/modules")).json()
+    }
+    assert "account_check" not in mods
+    assert mods["deliveries"]["always_on"] and mods["restock"]["managed_in"] == "listings"
+    assert mods["topups"]["managed_in"] == "listings" and mods["reports"]["managed_in"] is None
+    assert mods["deliveries"]["settings_schema"]["properties"]["auto_deliver"]["ui"] == "hidden"
+    off = await auth_client.put(
+        f"/api/v1/stores/{store_id}/modules/deliveries", json={"enabled": False}
+    )
+    assert off.status_code == 409 and "Automatic deliveries" in off.json()["detail"]
+    hold = await auth_client.put(
+        f"/api/v1/stores/{store_id}/modules/deliveries", json={"settings": {"auto_deliver": False}}
+    )
+    assert hold.status_code == 200 and hold.json()["settings"]["auto_deliver"] is False

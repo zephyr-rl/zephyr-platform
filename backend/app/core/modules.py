@@ -46,6 +46,8 @@ class Module(Protocol):
     settings_schema: type[BaseModel]
     requires: frozenset[Capability]
     default_enabled: bool
+    always_on: bool
+    managed_in: str | None
 
     def register(self, ctx: ModuleContext) -> None: ...
 
