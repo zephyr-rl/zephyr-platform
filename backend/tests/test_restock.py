@@ -177,6 +177,19 @@ async def test_refills_only_what_was_sold(session: AsyncSession, vault: Vault) -
     assert vault.logins() == ["user2", "user3", "user4"]
 
 
+async def test_vault_read_error_uploads_nothing(session: AsyncSession, vault: Vault) -> None:
+    """A failed read (429, 5xx, timeout, odd answer) is not an empty vault: nothing is uploaded."""
+    await vault.setup(session, target=3)
+    await vault.run()
+    vault.market.fail_next("vault_list", ConnectorError("Eldorado HTTP 429", retryable=True))
+    result = await vault.run()
+    assert result.uploaded == 0 and len(vault.logins()) == 3
+    assert "Marketplace error" in result.summary
+    assert await vault.states(session) == {"delivered": 3, "available": 2}
+    listing = await session.get(Listing, vault.listing_id)
+    assert listing is not None and listing.vault_count == 3  # the last known count is kept
+
+
 async def test_email_details_are_sent_only_when_asked(session: AsyncSession, vault: Vault) -> None:
     await vault.setup(session, email=True, target=1)
     await vault.run()

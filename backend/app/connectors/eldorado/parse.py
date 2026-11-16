@@ -174,6 +174,28 @@ def next_cursor(body: Any) -> str | None:
     return str(value) if value else None
 
 
+def vault_entries(body: Any) -> list[VaultEntry] | None:
+    """The accounts of a vault, or None when the body is not a vault listing.
+
+    Eldorado answers with a JSON list ([] when the vault is empty). Anything else, or an entry
+    without an account login, means the answer cannot be trusted as a count.
+    """
+    if isinstance(body, dict):
+        lists = [body.get(k) for k in ("results", "data", "items")]
+        body = next((v for v in lists if isinstance(v, list)), None)
+    if not isinstance(body, list):
+        return None
+    entries: list[VaultEntry] = []
+    for raw in body:
+        if not isinstance(raw, dict):
+            return None
+        entry = parse_vault_entry(raw)
+        if not entry.login.strip():
+            return None
+        entries.append(entry)
+    return entries
+
+
 def parse_vault_entry(data: dict[str, Any]) -> VaultEntry:
     structured = data.get("structuredDetails") or {}
     account = structured.get("accountDetails") or {}

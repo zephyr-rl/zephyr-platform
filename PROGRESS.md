@@ -379,6 +379,12 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     account is in stock in two stores today.
   - API: `/pools/{id}/accounts`, `/pools/{id}/export`, `DELETE /pools/{id}`, `/items/remove`,
     `/items/put-back`, `/convert`; import commit `put_back`; pool `tokens`.
+- 2026-11-16: **Restock: an odd vault answer is an error, never an empty vault.** The old bot
+  over-stocked "Affluenter … 35 Drops" (29 accounts for a target of 5) because a failed vault
+  read left the count at 0 and it uploaded 5 more. Here a 429 / 5xx / timeout already stopped
+  the pass; now a 200 that is not a list of accounts (an HTML page, another JSON shape, an
+  entry without a login) also raises and nothing is uploaded. Tests: 5 odd answers, empty
+  vault `[]`, and a restock pass after a failed read (0 uploaded, last count kept).
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

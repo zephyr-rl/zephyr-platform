@@ -267,7 +267,16 @@ class EldoradoConnector:
         body = await self._http.request(
             "GET", f"api/flexibleOffersUser/me/offers/{offer_id}/secretDetails"
         )
-        return [parse.parse_vault_entry(e) for e in parse.results(body)]
+        entries = parse.vault_entries(body)
+        if entries is None:
+            # A 200 that is not a list of accounts (an HTML page, another JSON shape) must never
+            # read as an empty vault: restock would then upload accounts that are not needed.
+            raise ConnectorError(
+                "Eldorado returned something that is not the list of vault accounts; "
+                "nothing was uploaded.",
+                retryable=True,
+            )
+        return entries
 
     async def vault_add(self, offer_id: str, entry: VaultEntry) -> RemoteResult:
         try:

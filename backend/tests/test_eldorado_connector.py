@@ -259,6 +259,31 @@ async def test_vault_entries_are_parsed(eldorado) -> None:
     assert "vault-pass" not in repr(entries)
 
 
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(200, text="<html>Just a moment...</html>"),
+        httpx.Response(200, json={"message": "maintenance"}),
+        httpx.Response(200),
+        httpx.Response(200, json=[{"id": "v1", "structuredDetails": {}}]),
+        httpx.Response(200, json=["not an entry"]),
+    ],
+)
+async def test_vault_answer_that_is_not_a_list_is_an_error(eldorado, server, response) -> None:
+    """Never read an odd 200 as an empty vault (the old bot over-stocked that way)."""
+    path = "/api/flexibleOffersUser/me/offers/acc-offer-1/secretDetails"
+    server.script("GET", path, response)
+    with pytest.raises(ConnectorError, match="not the list of vault accounts") as err:
+        await eldorado.vault_list("acc-offer-1")
+    assert err.value.retryable
+
+
+async def test_empty_vault_is_an_empty_list(eldorado, server) -> None:
+    path = "/api/flexibleOffersUser/me/offers/acc-offer-1/secretDetails"
+    server.script("GET", path, httpx.Response(200, json=[]))
+    assert await eldorado.vault_list("acc-offer-1") == []
+
+
 async def test_vault_add_payload(eldorado, server) -> None:
     entry = VaultEntry(
         login=" newuser ",
