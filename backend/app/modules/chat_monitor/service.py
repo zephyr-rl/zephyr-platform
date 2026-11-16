@@ -8,7 +8,8 @@ the old monitor used in production (so it does not spam):
   ``seller_active_minutes`` (automatic messages do not count as the seller writing);
 - at most one alert per conversation every ``cooldown_minutes``;
 - not for a short "thanks" / "ok" on a delivered order;
-- not for replies the deliveries module is waiting for (CONFIRM / CANCEL).
+- not for CONFIRM / CANCEL replies: the delivery flow reads them (ours, or the old system's
+  while a store is in shadow mode). Such a message does not count as waiting either.
 
 Completed, cancelled and refunded orders are not read. Only reads: works in shadow mode too.
 """
@@ -101,6 +102,16 @@ def _normal(text: str) -> str:
     return " ".join(_WORDS.sub(" ", text.lower()).split())
 
 
+def no_reply_needed(
+    text: str, state: str | None, settings: ChatMonitorSettings, deliveries: DeliveriesSettings
+) -> bool:
+    """A buyer message nobody has to answer by hand."""
+    if classify(text, deliveries.reply_languages) is not Reply.unknown:
+        return True  # CONFIRM / CANCEL: the delivery flow answers it
+    done = state in (OrderState.delivered.value, OrderState.completed.value)
+    return done and _normal(text) in {_normal(w) for w in settings.courtesy_replies}
+
+
 def _urgent(text: str, keywords: list[str]) -> bool:
     low = _normal(text)
     return any(_normal(k) and _normal(k) in low for k in keywords)
@@ -147,8 +158,33 @@ async def scan_store(platform: Platform, store_id: int, now: datetime | None = N
                         result.alerts += 1
             finally:
                 await connector.aclose()
+        await _settle_closed(session, store_id, settings, deliveries)
         await session.commit()
     return result
+
+
+async def _settle_closed(
+    session: AsyncSession,
+    store_id: int,
+    settings: ChatMonitorSettings,
+    deliveries: DeliveriesSettings,
+) -> None:
+    """Threads of orders that are no longer scanned (completed, cancelled, refunded)."""
+    rows = await session.execute(
+        select(ChatThread, Order.state)
+        .join(Order, Order.id == ChatThread.order_id)
+        .where(
+            ChatThread.store_id == store_id,
+            ChatThread.last_buyer_text.is_not(None),
+            ChatThread.no_reply_needed.is_(False),
+            Order.state.in_(CLOSED),
+        )
+    )
+    for thread, state in rows:
+        if thread.last_buyer_text and no_reply_needed(
+            thread.last_buyer_text, state, settings, deliveries
+        ):
+            thread.no_reply_needed = True
 
 
 async def _thread(session: AsyncSession, order: Order) -> ChatThread:
@@ -199,6 +235,11 @@ async def _process(
             thread.last_buyer_at = latest_buyer.sent_at
             thread.last_buyer_text = latest_buyer.text[:2000]
             thread.urgent = _urgent(latest_buyer.text, settings.alert_keywords)
+    if thread.last_buyer_text is not None:
+        # Every scan: the order state (delivered or not) can change the answer.
+        thread.no_reply_needed = no_reply_needed(
+            thread.last_buyer_text, order.state, settings, deliveries
+        )
     if not new:
         return False
 
@@ -216,19 +257,11 @@ async def _process(
     ):
         return False
     text = message.text.strip()
-    if order.state == OrderState.delivered.value and _normal(text) in {
-        _normal(w) for w in settings.courtesy_replies
-    }:
+    if no_reply_needed(text, order.state, settings, deliveries):
         return False
     fulfilment = await session.scalar(select(Fulfilment).where(Fulfilment.order_id == order.id))
     if fulfilment is not None and fulfilment.state is FulfilmentState.awaiting_buyer:
         return False  # deliveries reads this reply
-    if (
-        fulfilment is not None
-        and fulfilment.require_confirmation
-        and classify(text, deliveries.reply_languages) is not Reply.unknown
-    ):
-        return False
 
     thread.last_alert_at = now
     events.publish(

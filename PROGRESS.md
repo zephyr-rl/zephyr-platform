@@ -280,6 +280,12 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
   backend uses (Region/City names plus UTC, old duplicate names of the same city hidden);
   aliases a browser reports are still accepted. On the server the owner had typed
   "Buenos Aires/Argentina", which is not a tz name.
+- 2026-11-16: **Messages: CONFIRM / CANCEL replies and "thanks" no longer count as waiting.**
+  Seen on the server (3 threads: 2 ZephyrStore, 1 Kawai smurf): buyers' "confirm" on orders
+  the old system had already delivered and answered. In shadow mode there is no fulfilment
+  here, so only the alert was silenced, not the "waiting" count. Now `chat_threads.no_reply_needed`
+  is worked out on every scan (CONFIRM/CANCEL in any enabled language; a thanks on a delivered
+  or completed order), also for threads of orders that are no longer scanned.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

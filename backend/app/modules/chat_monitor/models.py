@@ -33,10 +33,15 @@ class ChatThread(TimestampMixin, Base):
     urgent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     handled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     handled_by: Mapped[str | None] = mapped_column(String(120))
+    # The buyer's last message needs nobody: a CONFIRM / CANCEL reply (the delivery flow, ours or
+    # the old system's, reads it) or a "thanks" on a delivered order.
+    no_reply_needed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
     @property
     def needs_reply(self) -> bool:
-        if self.last_buyer_at is None:
+        if self.last_buyer_at is None or self.no_reply_needed:
             return False
         if self.last_seller_at is not None and self.last_seller_at >= self.last_buyer_at:
             return False

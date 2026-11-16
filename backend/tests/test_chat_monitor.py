@@ -250,3 +250,42 @@ async def test_thread_state_is_kept(session: AsyncSession, chats: Chats) -> None
     assert thread is not None and thread.needs_reply and thread.last_alert_at is not None
     store = await session.get(Store, chats.store_id)
     assert store is not None
+
+
+async def test_confirm_on_a_delivered_order_is_not_waiting(
+    session: AsyncSession, chats: Chats
+) -> None:
+    """Seen on the server: CONFIRM replies to the old system, answered by its automatic message."""
+    await chats.setup(session)
+    await chats.order(session, "A1")  # delivered by the old system: no fulfilment here
+    await chats.order(session, "A2")
+    await chats.order(session, "A3")
+    chats.say("A1", "confirm", at=NOW - timedelta(minutes=3))
+    chats.say("A1", "✅ Delivery confirmed, enjoy!", at=NOW - timedelta(minutes=2), seller=True)
+    chats.say("A2", "Thank you", at=NOW - timedelta(minutes=2))
+    chats.say("A3", "the password is wrong", at=NOW - timedelta(minutes=2))
+    await chats.scan()
+    assert [a["order"] for a in await chats.alerts(session)] == ["A3"]
+    session.expire_all()
+    waiting = {t.conversation_id: t.needs_reply for t in await session.scalars(select(ChatThread))}
+    assert waiting == {"conv-A1": False, "conv-A2": False, "conv-A3": True}
+
+
+async def test_threads_of_closed_orders_are_settled(session: AsyncSession, chats: Chats) -> None:
+    await chats.setup(session)
+    await chats.order(session, "A1", state="paid")
+    chats.say("A1", "si", at=NOW - timedelta(minutes=2))  # Spanish CONFIRM
+    await chats.order(session, "A2", state="paid")
+    chats.say("A2", "gracias", at=NOW - timedelta(minutes=2))  # thanks before delivery: waiting
+    await chats.scan()
+    session.expire_all()
+    rows = {t.conversation_id: t for t in await session.scalars(select(ChatThread))}
+    assert rows["conv-A1"].needs_reply is False and rows["conv-A2"].needs_reply is True
+    a2_id = rows["conv-A2"].id
+    # The order is completed afterwards (no longer scanned): a later scan settles the thread.
+    for o in await session.scalars(select(Order).where(Order.remote_id.in_(("A1", "A2")))):
+        o.state = "completed"
+    await session.commit()
+    await chats.scan(NOW + timedelta(minutes=5))
+    session.expire_all()
+    assert (await session.get(ChatThread, a2_id)).needs_reply is False  # type: ignore[union-attr]
