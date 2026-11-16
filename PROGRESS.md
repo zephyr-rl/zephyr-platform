@@ -325,6 +325,12 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     target), cards (matched by the old group id on re-runs), single offers with a category.
     "Manual only" offers are left alone; extra-text presets are not imported (already in each
     card).
+- 2026-11-16: **Restock setup imported on the server** (`migrate-legacy-restock`, dry run
+  first): Zephyr 6 cards (all 18 offers attached; restock module on, every 1 min), Kawai 1
+  card (restock module off, as in the old system), Jewelry 1 card (module on, every 2 min).
+  Kawai's and Jewelry's offers attach when their offers are read from the marketplace.
+  Stores stay in shadow mode: restock only records what it would upload.
+  `zephyr.bat` now prints reports as UTF-8 (offer names with emoji broke the Windows console).
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off
