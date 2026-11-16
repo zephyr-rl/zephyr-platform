@@ -291,6 +291,18 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
   on stderr into errors after the platform was already stopped. Running UPDATE again brought
   it back. The scripts now judge native programs by their exit code only, and CI runs UPDATE
   with redirected output.
+- 2026-11-16: **Old data imported on the server** (over SSH; old folders only read).
+  - `legacy_snapshot`: copies of `C:\EldoradoBots\Eldorado API - *` in
+    `C:\ZephyrPlatform\legacy` (folder restricted to Administrators and SYSTEM).
+  - `migrate-legacy` (dry run first, then real; reports in `legacy\reports`): Zephyr 5669
+    accounts in 19 pools, 1769 history items; Kawai 6461 in 4 pools, 2616 history items;
+    Jewelry 179 in 2 pools, 3 history items. All "OK, counts reconcile". In stock and also in
+    the old history: 157 (Zephyr) + 5 (Kawai) = 162, left available as decided.
+  - `migrate-legacy-settings`: 5 Discord channels, 3 rules per store, chat cooldown, report
+    time, last reported day (2026-11-15), Zephyr top-up messages and 221 already-reminded
+    orders. Jewelry's time zone set to America/Argentina/Buenos_Aires from the old config
+    (it had been created with Europe/Madrid). Channels do not post while stores are in shadow
+    mode.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off
