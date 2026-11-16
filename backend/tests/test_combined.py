@@ -71,11 +71,12 @@ async def test_combined_summary_and_overview(
             "/api/v1/all/summary",
             params={
                 "start": (ba_today - timedelta(days=6)).isoformat(),
-                "end": ba_today.isoformat(),
+                # Madrid's today can already be the day after Buenos Aires' today.
+                "end": (ba_today + timedelta(days=1)).isoformat(),
             },
         )
     ).json()
-    assert len(week["series"]) >= 7 and week["revenue"] == "12.50"
+    assert len(week["series"]) >= 8 and week["revenue"] == "12.50"
 
     overview = (await auth_client.get("/api/v1/all/overview")).json()
     figures = {s["store"]: s for s in overview["stores"]}
