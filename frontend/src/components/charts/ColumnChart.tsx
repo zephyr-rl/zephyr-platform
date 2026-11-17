@@ -1,5 +1,5 @@
 /**
- * One series of columns over days (dataviz rules: one hue, columns <= 24px with a 4px rounded
+ * One series of columns over days (dataviz rules: neutral columns with the latest in the accent, columns <= 24px with a 4px rounded
  * top and a square base, hairline grid, hover and focus tooltips, a table view next to it).
  */
 import { useEffect, useRef, useState } from "react";
@@ -104,8 +104,11 @@ export function ColumnChart({
               {h > 0 && (
                 <path
                   d={columnPath(x, y(c.value), barW, h)}
-                  fill="var(--accent)"
-                  opacity={active === null || active === i ? 1 : 0.55}
+                  // One accent: the latest period. The rest stay neutral and light up on hover.
+                  fill={i === columns.length - 1 ? "var(--accent)" : "var(--text-muted)"}
+                  opacity={
+                    active === i ? 1 : i === columns.length - 1 ? (active === null ? 1 : 0.7) : 0.45
+                  }
                 />
               )}
               {i % labelEvery === 0 && (
@@ -149,7 +152,7 @@ export function ColumnChart({
           className="pointer-events-none absolute top-1 z-10 min-w-36 rounded-md border border-line-strong bg-raised px-3 py-2 text-[13px] shadow-raised"
           style={{ left: Math.min(Math.max(tipX - 72, 0), width - 160) }}
         >
-          <div className="tabular font-semibold">{tip.tooltip.value}</div>
+          <div className="tabular font-medium">{tip.tooltip.value}</div>
           {tip.tooltip.lines.map((line) => (
             <div key={line} className="text-muted">
               {line}

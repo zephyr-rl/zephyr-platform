@@ -30,7 +30,9 @@ function SettingField({
   error?: string;
   onChange: (value: unknown) => void;
 }) {
-  const label = schema.title ?? name;
+  // Schema titles come from field names ("Min Delay Seconds"): show them in sentence case.
+  const raw = schema.title ?? name;
+  const label = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
   const hint = schema.description;
   if (schema.ui === "hidden") return null; // set elsewhere (Listings)
   if (schema.ui === "listings") {
@@ -226,7 +228,7 @@ export function AutomationPage() {
   return (
     <>
       <div>
-        <h1 className="text-[22px] font-semibold">
+        <h1 className="text-[22px] font-medium">
           Automation{store && <span className="text-muted"> · settings for {store.name}</span>}
         </h1>
         <p className="mt-1 text-muted">

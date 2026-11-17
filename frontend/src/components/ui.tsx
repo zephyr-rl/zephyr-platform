@@ -3,6 +3,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as SwitchPrimitive from "@radix-ui/react-switch";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
 import { forwardRef, useId, useState } from "react";
+import { icons } from "./icons";
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -10,13 +11,15 @@ export function cx(...parts: (string | false | null | undefined)[]): string {
 
 // ---- Button ------------------------------------------------------------------------------
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "selected";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-on-accent font-semibold hover:brightness-110",
+  primary: "bg-accent text-on-accent font-medium hover:brightness-110",
   secondary: "bg-raised text-fg border border-line-strong hover:bg-hover",
   ghost: "bg-transparent text-fg/80 hover:bg-hover hover:text-fg",
-  danger: "bg-danger text-on-accent font-semibold hover:brightness-110",
+  danger: "bg-danger text-on-accent font-medium hover:brightness-110",
+  // The chosen option of a segmented control: a surface step, not the accent.
+  selected: "bg-hover text-fg border border-line-strong shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -82,7 +85,7 @@ export function Card({
     <section className={cx("rounded-lg border border-line bg-surface", className)}>
       {(title || actions) && (
         <header className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
-          {title && <h2 className="text-[15px] font-semibold">{title}</h2>}
+          {title && <h2 className="text-[15px] font-medium">{title}</h2>}
           {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
         </header>
       )}
@@ -95,20 +98,32 @@ export function Card({
 
 type Tone = "success" | "progress" | "warning" | "danger" | "neutral";
 
-const toneStyles: Record<Tone, { cls: string; glyph: string }> = {
-  success: { cls: "bg-success/12 text-success", glyph: "●" },
-  progress: { cls: "bg-accent/14 text-accent", glyph: "◐" },
-  warning: { cls: "bg-warning/14 text-warning", glyph: "▲" },
-  danger: { cls: "bg-danger/14 text-danger", glyph: "✕" },
-  neutral: { cls: "bg-hover text-muted", glyph: "○" },
+const toneStyles: Record<Tone, { cls: string; mark: ReactNode }> = {
+  success: { cls: "text-success", mark: <span className="size-1.5 rounded-full bg-current" /> },
+  progress: { cls: "text-accent", mark: <span className="size-1.5 rounded-full bg-current" /> },
+  warning: { cls: "bg-warning/10 text-warning", mark: icons.alert },
+  danger: { cls: "bg-danger/10 text-danger", mark: icons.urgent },
+  neutral: { cls: "text-muted", mark: <span className="size-1.5 rounded-full border border-current" /> },
 };
 
-/** Status is never color alone: every badge has a glyph and a label. */
+/**
+ * Status is never color alone: every badge has a mark and a label. Calm states are a dot and
+ * text; only warnings and problems get a tinted surface and an icon.
+ */
 export function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
   const t = toneStyles[tone];
   return (
-    <span className={cx("inline-flex items-center gap-1.5 rounded-sm px-2.5 py-0.5 text-[13px]", t.cls)}>
-      <span aria-hidden="true">{t.glyph}</span>
+    <span
+      data-tone={tone}
+      className={cx(
+        "inline-flex items-center gap-1.5 rounded-sm py-0.5 text-[13px] whitespace-nowrap",
+        tone === "warning" || tone === "danger" ? "px-2" : "px-0.5",
+        t.cls,
+      )}
+    >
+      <span aria-hidden="true" className="inline-flex">
+        {t.mark}
+      </span>
       {children}
     </span>
   );
@@ -255,7 +270,7 @@ export function ConfirmDialog({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/60" />
         <DialogPrimitive.Content className="fixed top-1/2 left-1/2 z-50 flex w-[min(460px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-lg border border-line-strong bg-raised p-6 shadow-raised">
-          <DialogPrimitive.Title className="text-base font-semibold">{title}</DialogPrimitive.Title>
+          <DialogPrimitive.Title className="text-base font-medium">{title}</DialogPrimitive.Title>
           <DialogPrimitive.Description className="leading-relaxed text-fg/80">
             {description}
           </DialogPrimitive.Description>
@@ -321,7 +336,7 @@ export function Modal({
                 : "w-[min(480px,calc(100vw-32px))]",
           )}
         >
-          <DialogPrimitive.Title className="text-base font-semibold">{title}</DialogPrimitive.Title>
+          <DialogPrimitive.Title className="text-base font-medium">{title}</DialogPrimitive.Title>
           {description ? (
             <DialogPrimitive.Description className="text-fg/80">{description}</DialogPrimitive.Description>
           ) : (
@@ -339,7 +354,7 @@ export function Modal({
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="flex flex-col items-start gap-2 px-4 py-10 sm:items-center sm:text-center">
-      <p className="font-semibold">{title}</p>
+      <p className="font-medium">{title}</p>
       {children && <div className="max-w-md text-muted">{children}</div>}
     </div>
   );

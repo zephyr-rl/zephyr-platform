@@ -155,7 +155,7 @@ export function OrdersPage() {
     <>
       <div className="flex flex-wrap items-center gap-3">
         <div>
-          <h1 className="text-[22px] font-semibold">Orders</h1>
+          <h1 className="text-[22px] font-medium">Orders</h1>
           <p className="mt-1 text-muted">
             {store.name} orders and their delivery.{store.shadow_mode && " Shadow mode: nothing is sent to buyers."}
           </p>
@@ -176,7 +176,7 @@ export function OrdersPage() {
         actions={
           <div role="group" aria-label="Show" className="flex gap-1">
             {FILTERS.map((f) => (
-              <Button key={f.key} size="sm" variant={show === f.key ? "primary" : "ghost"} aria-pressed={show === f.key} onClick={() => setShow(f.key)}>
+              <Button key={f.key} size="sm" variant={show === f.key ? "selected" : "ghost"} aria-pressed={show === f.key} onClick={() => setShow(f.key)}>
                 {f.label}
               </Button>
             ))}
@@ -208,7 +208,8 @@ export function OrdersPage() {
                     <td className="px-4 py-2.5">
                       <div className="font-medium">{o.offer_title ?? "Order"}</div>
                       <div className="text-muted">
-                        {plural(o.quantity, "unit")} · {o.remote_state ?? ""}
+                        {plural(o.quantity, "unit")}
+                        {o.remote_state ? ` · ${o.remote_state}` : ""}
                       </div>
                     </td>
                     <td className="px-4 py-2.5">{o.buyer_name ?? "—"}</td>

@@ -37,7 +37,7 @@ export function ScopeSwitch({
     <div className="flex gap-1" role="group" aria-label="Show">
       <Button
         size="sm"
-        variant={scope === "store" ? "primary" : "ghost"}
+        variant={scope === "store" ? "selected" : "ghost"}
         aria-pressed={scope === "store"}
         onClick={() => onChange("store")}
       >
@@ -45,7 +45,7 @@ export function ScopeSwitch({
       </Button>
       <Button
         size="sm"
-        variant={scope === "all" ? "primary" : "ghost"}
+        variant={scope === "all" ? "selected" : "ghost"}
         aria-pressed={scope === "all"}
         onClick={() => onChange("all")}
       >

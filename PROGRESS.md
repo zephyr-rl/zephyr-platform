@@ -385,6 +385,21 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
   the pass; now a 200 that is not a list of accounts (an HTML page, another JSON shape, an
   entry without a login) also raises and nothing is uploaded. Tests: 5 odd answers, empty
   vault `[]`, and a restock pass after a failed read (0 uploaded, last count kept).
+- 2026-11-17: **UI polish with unslop** (skill by Damir Sokolovsky, @heydamir, CC BY 4.0).
+  Light-slop audit, so polish mode: same palette, fonts, features and section order.
+  - Accent kept for primary actions: the chosen option of every segmented control is now a
+    surface step; neutral logo mark; quieter nav counts.
+  - Badges: calm states are a dot and text, only warnings and problems get a tint and an icon
+    (no more ✕ / ▲ text glyphs). Stock uses line icons for copy and tokens.
+  - Redundant labels removed ("Account" on every account offer). Headings at weight 500.
+  - Reports chart: neutral columns, the latest day in the accent; table bars neutral.
+  - Automation labels in sentence case; review filter hint without raw values.
+  - Palette checkboxes. Fixed "1 unit ·" in Orders and the cut order id in Messages.
+  - Overview rebuilt around "Needs you" (largest block, amber count, calm when empty), a
+    "Today" card, Stock (low pools named) and System (connection, modules, jobs as status
+    dots); activity groups repeats (×4) and shows 8 with "Show more". Same for All stores.
+  - The sidebar "cut at 900px" seen in full-page screenshots is a capture artifact: it is
+    sticky and fills the screen while scrolling.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

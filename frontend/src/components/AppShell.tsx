@@ -44,7 +44,7 @@ function NavLink({
       {icon}
       {label}
       {count ? (
-        <span className="ml-auto rounded-full bg-danger px-2 text-xs font-semibold text-on-accent" aria-label={`${count} need attention`}>
+        <span className="tabular ml-auto rounded-sm bg-danger/16 px-1.5 text-xs font-medium text-danger" aria-label={`${count} need attention`}>
           {count}
         </span>
       ) : null}
@@ -77,10 +77,10 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
       )}
     >
       <div className="flex items-center gap-2.5 px-2.5 pb-5">
-        <div className="flex size-7 items-center justify-center rounded-md bg-accent font-semibold text-on-accent">
+        <div className="flex size-7 items-center justify-center rounded-md border border-line-strong bg-raised text-[13px] font-medium">
           Z
         </div>
-        <span className="font-semibold">Zephyr Platform</span>
+        <span className="font-medium">Zephyr Platform</span>
       </div>
       {NAV.map((item) => (
         <NavLink key={item.to} {...item} onClick={onNavigate} count={counts[item.to]} />

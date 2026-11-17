@@ -77,7 +77,7 @@ function Stat({
   return (
     <div className="rounded-lg border border-line bg-surface px-4 py-3">
       <div className="text-[13px] text-muted">{label}</div>
-      <div className="mt-1 text-[28px] font-semibold">{value}</div>
+      <div className="mt-1 text-[28px] font-medium">{value}</div>
       {note && <div className="text-[13px] text-muted">{note}</div>}
     </div>
   );
@@ -90,7 +90,7 @@ function ShareBar({ share }: { share: number }) {
       aria-hidden="true"
     >
       <div
-        className="h-2 rounded-full bg-accent"
+        className="h-2 rounded-full bg-muted/60"
         style={{ width: `${Math.max(share > 0 ? 2 : 0, share * 100)}%` }}
       />
     </div>
@@ -164,7 +164,7 @@ export function ReportsPage() {
     <>
       <div className="flex flex-wrap items-center gap-3">
         <div>
-          <h1 className="text-[22px] font-semibold">Reports</h1>
+          <h1 className="text-[22px] font-medium">Reports</h1>
           <p className="mt-1 text-muted">
             {all
               ? "All stores added up, each store's days in its own time zone."
@@ -190,7 +190,7 @@ export function ReportsPage() {
           <Button
             key={p.key}
             size="sm"
-            variant={preset === p.key ? "primary" : "ghost"}
+            variant={preset === p.key ? "selected" : "ghost"}
             aria-pressed={preset === p.key}
             onClick={() => setPreset(p.key)}
           >

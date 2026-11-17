@@ -40,6 +40,7 @@ import {
   type StockItem,
   type StockPool,
 } from "@/lib/api";
+import { icons } from "@/components/icons";
 import { useStores } from "@/lib/session";
 import {
   copyText,
@@ -475,7 +476,7 @@ function ConvertFormat({
           <div role="group" aria-label="Output format" className="flex gap-1">
             <Button
               size="sm"
-              variant={!withToken ? "primary" : "ghost"}
+              variant={!withToken ? "selected" : "ghost"}
               aria-pressed={!withToken}
               onClick={() => {
                 setWithToken(false);
@@ -486,7 +487,7 @@ function ConvertFormat({
             </Button>
             <Button
               size="sm"
-              variant={withToken ? "primary" : "ghost"}
+              variant={withToken ? "selected" : "ghost"}
               aria-pressed={withToken}
               onClick={() => {
                 setWithToken(true);
@@ -593,7 +594,7 @@ function PoolList({
             aria-current={p.id === selectedId ? "page" : undefined}
             className={`flex items-center gap-2 rounded-md border px-2.5 py-2 text-[13px] ${
               p.id === selectedId
-                ? "border-accent bg-accent/10"
+                ? "border-line-strong bg-hover shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                 : "border-transparent hover:bg-hover"
             } ${p.archived ? "opacity-60" : ""}`}
           >
@@ -609,17 +610,18 @@ function PoolList({
                   ? "bg-danger/14 text-danger"
                   : p.low
                     ? "bg-warning/14 text-warning"
-                    : "bg-hover text-muted"
+                    : "text-muted"
               }`}
             >
               {p.counts.available.toLocaleString()}
             </span>
             {p.tokens > 0 && (
               <span
-                className="tabular rounded-sm bg-warning/14 px-1.5 text-[12px] text-warning"
+                className="tabular inline-flex items-center gap-1 text-[12px] text-muted"
                 title="Available accounts with a token"
               >
-                ⚿ {p.tokens.toLocaleString()}
+                {icons.key}
+                {p.tokens.toLocaleString()}
               </span>
             )}
           </Link>
@@ -909,9 +911,9 @@ function CopyCell({ value, what }: { value: string | null; what: string }) {
         type="button"
         aria-label={`Copy ${what.toLowerCase()} ${value}`}
         onClick={() => void copyText(value, what)}
-        className="shrink-0 rounded px-1 text-muted hover:bg-hover hover:text-fg"
+        className="inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-muted transition-colors hover:bg-hover hover:text-fg"
       >
-        ⧉
+        {icons.copy}
       </button>
     </span>
   );
@@ -1169,7 +1171,7 @@ function PoolPanel({
     <div className="flex min-w-0 flex-col gap-4">
       <section className="flex flex-wrap items-start gap-3 rounded-lg border border-line bg-surface p-4">
         <div className="min-w-0 flex-1">
-          <h2 className="text-[18px] font-semibold">{pool.name}</h2>
+          <h2 className="text-[18px] font-medium">{pool.name}</h2>
           <p className="text-[13px] text-muted">
             {pool.game} · {plural(pool.counts.available, "available account")} ·{" "}
             {plural(pool.tokens, "token")}
@@ -1181,7 +1183,7 @@ function PoolPanel({
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
-            variant={panel === "import" ? "primary" : "secondary"}
+            variant={panel === "import" ? "selected" : "secondary"}
             onClick={() => {
               setImportText(null);
               setPanel(panel === "import" ? "none" : "import");
@@ -1191,7 +1193,7 @@ function PoolPanel({
           </Button>
           <Button
             size="sm"
-            variant={panel === "extract" ? "primary" : "secondary"}
+            variant={panel === "extract" ? "selected" : "secondary"}
             onClick={() => setPanel(panel === "extract" ? "none" : "extract")}
           >
             Extract
@@ -1660,7 +1662,7 @@ function StockManager({ poolId }: { poolId?: number }) {
     <>
       <div className="flex flex-wrap items-center gap-3">
         <div>
-          <h1 className="text-[22px] font-semibold">Stock</h1>
+          <h1 className="text-[22px] font-medium">Stock</h1>
           <p className="mt-1 text-muted">
             {plural(available, "account")} available in{" "}
             {plural(list.filter((p) => !p.archived).length, "pool")} of{" "}

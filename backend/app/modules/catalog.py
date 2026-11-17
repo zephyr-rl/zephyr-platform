@@ -124,8 +124,8 @@ class ReviewRemindersSettings(_Settings):
     lookback_days: int = Field(14, ge=1, le=60, description="Older orders are never reminded.")
     review_filter: Literal["skip_negative", "skip_reviewed", "remind_all"] = Field(
         "skip_negative",
-        description="skip_negative: not when that order got a negative review. "
-        "skip_reviewed: not when it got any review. remind_all: review or not.",
+        description="Skip negative: not when that order got a negative review. "
+        "Skip reviewed: not when it got any review. Remind all: review or not.",
     )
     buyer_cooldown_days: int = Field(
         14, ge=0, le=90, description="At most one reminder per buyer within this many days."

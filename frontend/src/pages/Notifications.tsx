@@ -815,7 +815,7 @@ export function NotificationsPage() {
   return (
     <>
       <div>
-        <h1 className="text-[22px] font-semibold">Notifications</h1>
+        <h1 className="text-[22px] font-medium">Notifications</h1>
         <p className="mt-1 text-muted">
           Where alerts go and what they look like. One place for every store.
         </p>

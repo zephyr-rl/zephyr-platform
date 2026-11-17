@@ -36,10 +36,10 @@ export function LoginPage() {
         noValidate
       >
         <div className="flex items-center gap-2.5">
-          <div className="flex size-8 items-center justify-center rounded-md bg-accent font-semibold text-on-accent">
+          <div className="flex size-8 items-center justify-center rounded-md border border-line-strong bg-raised font-medium">
             Z
           </div>
-          <h1 className="text-lg font-semibold">Sign in to Zephyr Platform</h1>
+          <h1 className="text-lg font-medium">Sign in to Zephyr Platform</h1>
         </div>
         <TextField
           label="E-mail"

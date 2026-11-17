@@ -65,7 +65,7 @@ export function RemindersPage() {
   return (
     <>
       <div>
-        <h1 className="text-[22px] font-semibold">Review reminders</h1>
+        <h1 className="text-[22px] font-medium">Review reminders</h1>
         <p className="mt-1 text-muted">
           Ask {store.name}'s buyers for a review some time after their order. One reminder per order, ever, sent one at a time with a pause in between.
         </p>
@@ -88,17 +88,17 @@ export function RemindersPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-line bg-surface px-4 py-3">
               <div className="text-[13px] text-muted">Sent in the last 24 hours</div>
-              <div className="mt-1 text-[28px] font-semibold">
+              <div className="mt-1 text-[28px] font-medium">
                 {s.sent_last_day} <span className="text-[15px] font-normal text-muted">of {s.daily_cap}</span>
               </div>
             </div>
             <div className="rounded-lg border border-line bg-surface px-4 py-3">
               <div className="text-[13px] text-muted">In the queue</div>
-              <div className="mt-1 text-[28px] font-semibold">{s.queued}</div>
+              <div className="mt-1 text-[28px] font-medium">{s.queued}</div>
             </div>
             <div className="rounded-lg border border-line bg-surface px-4 py-3">
               <div className="text-[13px] text-muted">Mode</div>
-              <div className="mt-1 text-[15px] font-semibold">{s.automatic ? "Automatic" : "You choose and start each batch"}</div>
+              <div className="mt-1 text-[15px] font-medium">{s.automatic ? "Automatic" : "You choose and start each batch"}</div>
               <div className="text-[13px] text-muted">Review filter: {FILTER_LABEL[s.review_filter] ?? s.review_filter}.</div>
             </div>
           </div>

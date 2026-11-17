@@ -9,7 +9,7 @@ function Icon({ children, size = 16 }: { children: ReactNode; size?: number }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -86,6 +86,35 @@ export const icons = {
   chevron: (
     <Icon size={14}>
       <path d="M6 9l6 6 6-6" />
+    </Icon>
+  ),
+  alert: (
+    <Icon size={13}>
+      <path d="M12 4l9 16H3z" />
+      <path d="M12 10v4M12 17h.01" />
+    </Icon>
+  ),
+  urgent: (
+    <Icon size={13}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v6M12 16.5h.01" />
+    </Icon>
+  ),
+  copy: (
+    <Icon size={14}>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V5a1 1 0 0 1 1-1h9" />
+    </Icon>
+  ),
+  key: (
+    <Icon size={12}>
+      <circle cx="8" cy="15" r="4" />
+      <path d="M11 12l9-9M16 7l3 3" />
+    </Icon>
+  ),
+  arrow: (
+    <Icon size={14}>
+      <path d="M9 6l6 6-6 6" />
     </Icon>
   ),
   logout: (

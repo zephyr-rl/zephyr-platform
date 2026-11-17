@@ -701,7 +701,7 @@ export function ListingsPage() {
     <>
       <div className="flex flex-wrap items-center gap-3">
         <div>
-          <h1 className="text-[22px] font-semibold">Listings</h1>
+          <h1 className="text-[22px] font-medium">Listings</h1>
           <p className="mt-1 text-muted">
             {store.name}'s offers on the marketplace and how each one is
             delivered.
@@ -779,7 +779,7 @@ export function ListingsPage() {
             <Button
               key={f}
               size="sm"
-              variant={stateFilter === f ? "primary" : "ghost"}
+              variant={stateFilter === f ? "selected" : "ghost"}
               aria-pressed={stateFilter === f}
               onClick={() => setStateFilter(f)}
             >
@@ -898,7 +898,6 @@ export function ListingsPage() {
                       <td className="px-4 py-2.5">
                         <div className="font-medium">{l.title}</div>
                         <div className="mt-1 flex flex-wrap gap-1.5">
-                          <Badge tone="neutral">{KIND_LABEL[l.kind]}</Badge>
                           {l.group_id !== null && (
                             <Badge tone="progress">
                               Card ·{" "}

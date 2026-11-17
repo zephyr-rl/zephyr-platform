@@ -60,7 +60,7 @@ function Thread({ storeId, thread }: { storeId: number; thread: ChatThread }) {
         <div className="mt-1.5 text-[13px] text-muted">
           {[
             thread.offer_title,
-            thread.order_remote_id && `Order #${thread.order_remote_id.slice(0, 8)}`,
+            thread.order_remote_id && `Order #${thread.order_remote_id.length > 12 ? `${thread.order_remote_id.slice(0, 8)}…` : thread.order_remote_id}`,
             thread.handled_by && thread.handled_at && `Handled by ${thread.handled_by} ${ago(thread.handled_at)}`,
           ]
             .filter(Boolean)
@@ -128,7 +128,7 @@ export function MessagesPage() {
     <>
       <div className="flex flex-wrap items-center gap-3">
         <div>
-          <h1 className="text-[22px] font-semibold">Messages</h1>
+          <h1 className="text-[22px] font-medium">Messages</h1>
           <p className="mt-1 text-muted">
             Buyer messages in {store.name}'s order chats that nobody has
             answered. Alerts for them go to Discord as set in{" "}
@@ -158,7 +158,7 @@ export function MessagesPage() {
               <Button
                 key={key}
                 size="sm"
-                variant={show === key ? "primary" : "ghost"}
+                variant={show === key ? "selected" : "ghost"}
                 aria-pressed={show === key}
                 onClick={() => setShow(key)}
               >

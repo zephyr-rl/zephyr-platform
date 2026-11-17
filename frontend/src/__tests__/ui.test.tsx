@@ -6,7 +6,8 @@ describe("Badge", () => {
   it("never shows status by color alone", () => {
     render(<Badge tone="danger">Failed</Badge>);
     const badge = screen.getByText("Failed");
-    expect(badge.textContent).toContain("✕");
+    expect(badge.querySelector("svg")).not.toBeNull(); // an icon next to the label
+    expect(badge.dataset.tone).toBe("danger");
   });
 });
 

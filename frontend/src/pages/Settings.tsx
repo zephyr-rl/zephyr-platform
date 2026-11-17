@@ -433,7 +433,7 @@ function BackupsCard() {
 export function SettingsPage() {
   return (
     <>
-      <h1 className="text-[22px] font-semibold">Settings</h1>
+      <h1 className="text-[22px] font-medium">Settings</h1>
       <StoresCard />
       <ConnectionsCard />
       <PasswordCard />
