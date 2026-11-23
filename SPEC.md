@@ -358,7 +358,7 @@ The importer is idempotent (re-runnable) and prints a reconciliation report.
 | 8 | Top-Ups + Review Reminders (per-store switches) | Tests pass |
 | 9 | Panel screens on the chosen design (desktop + mobile) | Full walkthrough |
 | 10 | Shadow mode on the Linux VPS | 3 days with zero unexplained differences |
-| 11 | Cut-over: Jewelry → Kawai smurf → ZephyrStore | One stable week per store |
+| 11 | Cut-over: ZephyrStore → Kawai smurf → Jewelry (owner's choice, 2026-11-23) | One stable week per store |
 | 12+ | Discord bot, account check, absorb Price Sniper / CS2 / RL Checker, new marketplaces | — |
 
 ## 15. Decisions log
@@ -390,3 +390,4 @@ Decision pending; it does not block stages 1–9.
 
 1. Access method for the panel (see 15.1).
 2. Discord server/channels for alerts once the bot replaces webhooks (not needed until stage 12).
+| 2026-11-23 | Cut-over order changed by the owner: ZephyrStore first, then Kawai smurf, then Jewelry. Each store needs 3 days of shadow mode with real mappings and no unexplained differences first (shadow restarted 2026-11-23 18:15 UTC, after the item deliveries were imported). |
