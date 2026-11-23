@@ -373,6 +373,7 @@ The importer is idempotent (re-runnable) and prints a reconciliation report.
 | 2026-11-14 | Single user (owner) for now. The role model stays in the schema but v1 only ships the `owner` role. |
 | 2026-11-14 | Domain: probably `zephyrstore.site` (not bought yet). Until then the panel is reached by IP (see 15.1). |
 | 2026-11-14 | Future marketplaces to keep in mind: GameBoost, PlayerAuctions (if it has an API), G2G, G2A. **Nothing is built for them yet**; the connector contract just must not assume Eldorado-only concepts. |
+| 2026-11-23 | Cut-over order changed by the owner: ZephyrStore first, then Kawai smurf, then Jewelry. Each store needs 3 days of shadow mode with real mappings and no unexplained differences first (shadow restarted 2026-11-23 18:15 UTC, after the item deliveries were imported). |
 
 ### 15.1 Access without a domain
 
@@ -390,4 +391,3 @@ Decision pending; it does not block stages 1–9.
 
 1. Access method for the panel (see 15.1).
 2. Discord server/channels for alerts once the bot replaces webhooks (not needed until stage 12).
-| 2026-11-23 | Cut-over order changed by the owner: ZephyrStore first, then Kawai smurf, then Jewelry. Each store needs 3 days of shadow mode with real mappings and no unexplained differences first (shadow restarted 2026-11-23 18:15 UTC, after the item deliveries were imported). |
