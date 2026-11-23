@@ -410,6 +410,13 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     CANCEL texts, kill switch; per offer the pool (old category), automatic or held for
     approval, accounts per unit, confirmation and own guide; "tip" offers become text-only.
     Tests: tests/test_legacy_items.py.
+  - Applied on the server (stores still in shadow mode): stock re-synced with the old databases
+    (`--sync-removed`: Jewelry +2 / 7 taken out, Kawai 6 taken out, Zephyr 129 taken out; all
+    counts reconcile), offers read and item deliveries mapped (Jewelry 1, Kawai 6, Zephyr 7 +
+    2 tip offers as text), restock setup re-imported.
+  - Mistake found and fixed: re-running the restock import set Zephyr's restock switch back to
+    the old config (off). Restored to on, every 1 min (audit actor `claude:restore`). The
+    importer now only sets the switch and interval on the first import.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

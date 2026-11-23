@@ -241,8 +241,13 @@ async def test_legacy_restock_import(
     new_xbox = await session.scalar(select(Listing).where(Listing.remote_offer_id == "off-xb"))
     assert new_xbox is not None and new_xbox.device == "xbox" and new_xbox.restock_target == 5
 
-    # Running it again updates the same card.
+    # Running it again updates the same card, and keeps the switch the owner set since.
+    await stores.set_module(session, platform, ACTOR, store_id, "restock", enabled=False)
+    await session.commit()
     again = await migrate_restock(session, platform, ACTOR, folder=tmp_path, store_id=store_id)
+    assert again.module == "kept as set in the panel (imported before)"
+    kept = await session.scalar(select(StoreModule).where(StoreModule.module_key == "restock"))
+    assert kept is not None and kept.enabled is False
     assert again.cards_updated == ["🔥Black Neural Network & 6 Cases"] and not again.waiting_offers
     assert await session.scalar(select(func.count()).select_from(ListingGroup)) == 1
     assert await session.scalar(select(func.count()).select_from(StockPool)) == 1

@@ -75,18 +75,28 @@ async def migrate_restock(
     }
 
     # 1. The module: on/off, interval (seconds in the old system, minutes here), default target.
+    #    Only on the first import: once cards exist, the switch and interval are the owner's,
+    #    set in Listings, and a re-run (before the cut-over) must not undo them.
     interval = max(1, math.ceil(int(cfg.get("checkInterval") or 60) / 60))
     target = max(1, min(100, int(cfg.get("targetStock") or 1)))
-    await stores.set_module(
-        session,
-        platform,
-        actor,
-        store_id,
-        "restock",
-        enabled=bool(cfg.get("enabled")),
-        settings={"interval_minutes": interval},
+    already = await session.scalar(
+        select(ListingGroup.id).where(
+            ListingGroup.store_id == store_id, ListingGroup.legacy_id.is_not(None)
+        )
     )
-    report.module = f"{'on' if cfg.get('enabled') else 'off'}, every {interval} min"
+    if already is None:
+        await stores.set_module(
+            session,
+            platform,
+            actor,
+            store_id,
+            "restock",
+            enabled=bool(cfg.get("enabled")),
+            settings={"interval_minutes": interval},
+        )
+        report.module = f"{'on' if cfg.get('enabled') else 'off'}, every {interval} min"
+    else:
+        report.module = "kept as set in the panel (imported before)"
 
     # 2. Cross-platform cards.
     for legacy_id, g in (cfg.get("crossPlatformGroups") or {}).items():
