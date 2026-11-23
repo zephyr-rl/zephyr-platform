@@ -414,9 +414,10 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     (`--sync-removed`: Jewelry +2 / 7 taken out, Kawai 6 taken out, Zephyr 129 taken out; all
     counts reconcile), offers read and item deliveries mapped (Jewelry 1, Kawai 6, Zephyr 7 +
     2 tip offers as text), restock setup re-imported.
-  - Mistake found and fixed: re-running the restock import set Zephyr's restock switch back to
-    the old config (off). Restored to on, every 1 min (audit actor `claude:restore`). The
-    importer now only sets the switch and interval on the first import.
+  - Re-running the restock import changed Zephyr's restock switch; I set it back to on, but the
+    owner had decided it stays off. Now off (interval 1 min kept; audit actor
+    `claude:owner-asked-off`). The importer now only sets the switch and interval on the first
+    import. Restock state: Zephyr off, Kawai off, Jewelry on (every 2 min).
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off
