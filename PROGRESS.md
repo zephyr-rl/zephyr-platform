@@ -400,6 +400,16 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     dots); activity groups repeats (×4) and shows 8 with "Show more". Same for All stores.
   - The sidebar "cut at 900px" seen in full-page screenshots is a capture artifact: it is
     sticky and fills the screen while scrolling.
+- 2026-11-23: **Cut-over preparation started** (Antigravity subscription ended; the owner asked
+  to take over the old project and move to the new one).
+  - Shadow comparison over 72 h showed the platform would have delivered nothing: the custom
+    item offers were never mapped (the old `item_delivery_config.json` had no importer) and
+    Kawai's and Jewelry's offers had never been read.
+  - New `migrate-legacy-items` (read-only on the old folder; `--sync` reads the offers first,
+    `--dry-run`): store message ({items} + old guide, "Twitch Account" label), CONFIRM /
+    CANCEL texts, kill switch; per offer the pool (old category), automatic or held for
+    approval, accounts per unit, confirmation and own guide; "tip" offers become text-only.
+    Tests: tests/test_legacy_items.py.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

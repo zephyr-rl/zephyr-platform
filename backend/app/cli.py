@@ -130,6 +130,31 @@ async def migrate_legacy_restock(slug: str, folder: Path, *, dry_run: bool) -> N
     print(format_restock_report(report, name))
 
 
+async def migrate_legacy_items(slug: str, folder: Path, *, dry_run: bool, sync: bool) -> None:
+    from app.legacy.items import format_items_report, migrate_items
+    from app.stores.models import Store
+
+    platform = build_platform(get_settings())
+    try:
+        async with platform.db.sessionmaker() as session:
+            store = await session.scalar(select(Store).where(Store.slug == slug))
+            if store is None:
+                sys.exit(f"No store with slug {slug!r}. Create it in the panel first.")
+            name = store.name
+            report = await migrate_items(
+                session,
+                platform,
+                Actor.system("migrate-legacy"),
+                folder=folder,
+                store_id=store.id,
+                dry_run=dry_run,
+                sync_first=sync,
+            )
+    finally:
+        await platform.db.dispose()
+    print(format_items_report(report, name))
+
+
 async def compare_shadow(slug: str, folder: Path, hours: int) -> int:
     from datetime import timedelta
 
@@ -198,6 +223,23 @@ def main(argv: list[str] | None = None) -> None:
         "--folder", required=True, type=Path, help="The old store folder (with restock_config.json)"
     )
     legacy_restock.add_argument("--dry-run", action="store_true", help="Report only, save nothing")
+    legacy_items = sub.add_parser(
+        "migrate-legacy-items",
+        help="Import an old store's item deliveries (item_delivery_config.json, read-only)",
+    )
+    legacy_items.add_argument("--store", required=True, help="Slug of the store")
+    legacy_items.add_argument(
+        "--folder",
+        required=True,
+        type=Path,
+        help="The old store folder (with item_delivery_config.json)",
+    )
+    legacy_items.add_argument("--dry-run", action="store_true", help="Report only, save nothing")
+    legacy_items.add_argument(
+        "--sync",
+        action="store_true",
+        help="First read the store's offers from the marketplace (only reads)",
+    )
     shadow_cmp = sub.add_parser(
         "compare-shadow",
         help="Compare the old system's logs with what the platform would have done (read-only)",
@@ -223,6 +265,11 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "compare-shadow":
         sys.exit(asyncio.run(compare_shadow(args.store, args.folder, args.hours)))
 
+    if args.command == "migrate-legacy-items":
+        asyncio.run(
+            migrate_legacy_items(args.store, args.folder, dry_run=args.dry_run, sync=args.sync)
+        )
+        return
     if args.command == "migrate-legacy-restock":
         asyncio.run(migrate_legacy_restock(args.store, args.folder, dry_run=args.dry_run))
         return
