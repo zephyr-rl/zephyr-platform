@@ -429,6 +429,10 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     the PsyNet keys from psy.jaren.wtf with built-in fallbacks, like the original script.
   - Tables rp_epic_accounts / rp_checks (migration b3e9c1d7a4f2); dependency `websockets`.
     Tests: tests/test_rocket_pass.py (protocol fakes, jobs, Xbox wait, API).
+- 2026-11-24: Shadow check day 1 of 3 (24 h): no differences in any store. Zephyr: 7 top-up
+  instructions match, 7 account orders delivered by Eldorado from the vault (restock off on
+  both sides), no custom-item orders yet. Kawai and Jewelry: 1 automatic item delivery each,
+  same order as the old bot.
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off
