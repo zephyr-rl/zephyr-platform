@@ -429,6 +429,8 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     the PsyNet keys from psy.jaren.wtf with built-in fallbacks, like the original script.
   - Tables rp_epic_accounts / rp_checks (migration b3e9c1d7a4f2); dependency `websockets`.
     Tests: tests/test_rocket_pass.py (protocol fakes, jobs, Xbox wait, API).
+  - Owner's correction: adding an account is only a field to paste the code or the JSON, like
+    the old project (no "Open Epic sign-in" button or steps).
 - 2026-11-24: Shadow check day 1 of 3 (24 h): no differences in any store. Zephyr: 7 top-up
   instructions match, 7 account orders delivered by Eldorado from the vault (restock off on
   both sides), no custom-item orders yet. Kawai and Jewelry: 1 automatic item delivery each,

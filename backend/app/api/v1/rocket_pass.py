@@ -12,7 +12,7 @@ from sqlalchemy import select
 
 from app.api.deps import OwnerDep, PlatformDep, SessionDep
 from app.tools.rocketpass import service
-from app.tools.rocketpass.client import AUTH_URL, RocketPassError
+from app.tools.rocketpass.client import RocketPassError
 from app.tools.rocketpass.models import CheckKind, EpicAccount, PassCheck
 
 router = APIRouter(prefix="/tools/rocket-pass", tags=["tools"])
@@ -55,10 +55,6 @@ class StartIn(BaseModel):
     kind: CheckKind = CheckKind.check
 
 
-class Info(BaseModel):
-    login_url: str
-
-
 def _account(a: EpicAccount) -> AccountOut:
     return AccountOut(
         id=a.id,
@@ -90,11 +86,6 @@ def _check(c: PassCheck) -> CheckOut:
         created_at=c.created_at,
         finished_at=c.finished_at,
     )
-
-
-@router.get("", response_model=Info)
-async def info(_: OwnerDep) -> Info:
-    return Info(login_url=AUTH_URL)
 
 
 @router.get("/accounts", response_model=list[AccountOut])

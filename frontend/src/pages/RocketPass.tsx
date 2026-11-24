@@ -97,10 +97,6 @@ function PassSummary({ result }: { result: PassResult }) {
 
 function SignIn({ onStarted }: { onStarted: (c: PassCheck) => void }) {
   const queryClient = useQueryClient();
-  const info = useQuery({
-    queryKey: ["rocket-pass", "info"],
-    queryFn: () => api<{ login_url: string }>(BASE),
-  });
   const [code, setCode] = useState("");
   const add = useMutation({
     mutationFn: () =>
@@ -114,7 +110,7 @@ function SignIn({ onStarted }: { onStarted: (c: PassCheck) => void }) {
       onStarted(check);
     },
     onError: (error) =>
-      toast.error("Could not sign in", { description: error.message }),
+      toast.error("Could not add the account", { description: error.message }),
   });
   return (
     <Card title="Add an Epic account">
@@ -125,35 +121,15 @@ function SignIn({ onStarted }: { onStarted: (c: PassCheck) => void }) {
           add.mutate();
         }}
       >
-        <ol className="flex flex-col gap-1.5 text-[13px] text-muted">
-          <li>
-            1. Open the Epic sign-in and log into the account. To add a
-            different account, sign out of Epic in that browser first.
-          </li>
-          <li>
-            2. The page shows a text with “authorizationCode”. Copy it, or the
-            whole page, and paste it here.
-          </li>
-        </ol>
-        <div>
-          <Button
-            type="button"
-            disabled={!info.data}
-            onClick={() =>
-              info.data &&
-              window.open(info.data.login_url, "_blank", "noopener")
-            }
-          >
-            Open Epic sign-in
-          </Button>
-        </div>
         <TextAreaField
-          label="Code or page text"
+          label="Authorization code or JSON"
+          hint="The 32-character code, or the whole JSON with “authorizationCode”."
           mono
-          rows={3}
+          rows={4}
           value={code}
           onChange={(e) => setCode(e.target.value)}
           autoComplete="off"
+          autoFocus
         />
         <div className="flex justify-end">
           <Button

@@ -368,9 +368,6 @@ async def test_xbox_sync_waits_for_the_microsoft_code(
 async def test_api_flow(
     auth_client: httpx.AsyncClient, platform: Platform, fakes: tuple[FakeEpic, FakePsyNet]
 ) -> None:
-    info = (await auth_client.get("/api/v1/tools/rocket-pass")).json()
-    assert info["login_url"].startswith("https://www.epicgames.com/id/login")
-
     bad = await auth_client.post(
         "/api/v1/tools/rocket-pass/accounts", json={"code": "not a code at all"}
     )
