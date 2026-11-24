@@ -58,6 +58,7 @@ interface PassCheck {
   xbox_verification_uri: string | null;
   created_at: string;
   finished_at: string | null;
+  log: { at: string; level: "info" | "warn" | "error"; message: string }[];
 }
 
 const BASE = "/tools/rocket-pass";
@@ -215,6 +216,68 @@ function PassReport({
           Close
         </Button>
         <CopyButton text={text} label="Copy text" />
+      </div>
+    </Modal>
+  );
+}
+
+const timeOnly = new Intl.DateTimeFormat(undefined, {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
+function CheckLog({
+  check,
+  onClose,
+}: {
+  check: PassCheck;
+  onClose: () => void;
+}) {
+  const text = check.log
+    .map(
+      (e) =>
+        `${new Date(e.at).toISOString().replace("T", " ").slice(0, 19)} ${e.level.toUpperCase().padEnd(5)} ${e.message}`,
+    )
+    .join("\n");
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => !o && onClose()}
+      extraWide
+      title={`Log · ${KIND_LABEL[check.kind]} · ${check.display_name}`}
+      description={`${dateTime.format(new Date(check.created_at))} · ${check.state === "failed" ? "Failed" : check.state === "done" ? "Finished" : "Running"}`}
+    >
+      {check.log.length ? (
+        <ol className="max-h-[60vh] overflow-y-auto rounded-md border border-line bg-bg p-3 font-mono text-[12px] leading-5">
+          {check.log.map((e, i) => (
+            <li key={i} className="flex gap-3">
+              <span className="tabular shrink-0 text-muted">
+                {timeOnly.format(new Date(e.at))}
+              </span>
+              <span
+                className={`w-12 shrink-0 ${e.level === "error" ? "text-danger" : e.level === "warn" ? "text-warning" : "text-muted"}`}
+              >
+                {e.level}
+              </span>
+              <span
+                className={`min-w-0 break-words ${e.level === "error" ? "text-danger" : ""}`}
+              >
+                {e.message}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="text-muted">
+          This check has no log (it ran before logs were added).
+        </p>
+      )}
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onClose}>
+          Close
+        </Button>
+        {check.log.length > 0 && <CopyButton text={text} label="Copy log" />}
       </div>
     </Modal>
   );
@@ -440,6 +503,7 @@ function AccountRow({
 
 export function RocketPassPage() {
   const queryClient = useQueryClient();
+  const [logOf, setLogOf] = useState<number | null>(null);
   const accounts = useQuery({
     queryKey: ["rocket-pass", "accounts"],
     queryFn: () => api<EpicAccount[]>(`${BASE}/accounts`),
@@ -551,7 +615,8 @@ export function RocketPassPage() {
                   <th className="px-2 py-2.5 font-medium">Account</th>
                   <th className="px-2 py-2.5 font-medium">Action</th>
                   <th className="px-2 py-2.5 font-medium">Result</th>
-                  <th className="px-4 py-2.5 font-medium">By</th>
+                  <th className="px-2 py-2.5 font-medium">By</th>
+                  <th className="px-4 py-2.5" />
                 </tr>
               </thead>
               <tbody>
@@ -586,7 +651,16 @@ export function RocketPassPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 text-muted">{c.actor}</td>
+                    <td className="px-2 py-2.5 text-muted">{c.actor}</td>
+                    <td className="px-4 py-2 text-right">
+                      <Button
+                        size="sm"
+                        variant={c.state === "failed" ? "secondary" : "ghost"}
+                        onClick={() => setLogOf(c.id)}
+                      >
+                        Log
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -596,6 +670,12 @@ export function RocketPassPage() {
           <EmptyState title={checks.isLoading ? "Loading…" : "No checks yet"} />
         )}
       </Card>
+      {logOf !== null && checks.data?.find((c) => c.id === logOf) && (
+        <CheckLog
+          check={checks.data.find((c) => c.id === logOf)!}
+          onClose={() => setLogOf(null)}
+        />
+      )}
     </>
   );
 }

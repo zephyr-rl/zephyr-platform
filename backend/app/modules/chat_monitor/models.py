@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db import Base, TimestampMixin
+from app.core.db import Base, TimestampMixin, utcnow
+
+WAITING_HOURS = 24  # a conversation counts as waiting for this long without an answer
 
 
 class ChatThread(TimestampMixin, Base):
@@ -42,6 +44,10 @@ class ChatThread(TimestampMixin, Base):
     @property
     def needs_reply(self) -> bool:
         if self.last_buyer_at is None or self.no_reply_needed:
+            return False
+        # Eldorado does not tell which chats the seller read: after a day without an answer the
+        # conversation stops counting (it is still listed under "All").
+        if utcnow() - self.last_buyer_at > timedelta(hours=WAITING_HOURS):
             return False
         if self.last_seller_at is not None and self.last_seller_at >= self.last_buyer_at:
             return False

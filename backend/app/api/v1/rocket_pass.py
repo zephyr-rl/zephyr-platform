@@ -45,6 +45,7 @@ class CheckOut(BaseModel):
     xbox_expires_at: datetime | None
     created_at: datetime
     finished_at: datetime | None
+    log: list[dict[str, Any]]
 
 
 class SignInIn(BaseModel):
@@ -85,6 +86,7 @@ def _check(c: PassCheck) -> CheckOut:
         xbox_expires_at=c.xbox_expires_at if c.state.value == "waiting" else None,
         created_at=c.created_at,
         finished_at=c.finished_at,
+        log=c.log or [],
     )
 
 

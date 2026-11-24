@@ -289,3 +289,47 @@ async def test_threads_of_closed_orders_are_settled(session: AsyncSession, chats
     await chats.scan(NOW + timedelta(minutes=5))
     session.expire_all()
     assert (await session.get(ChatThread, a2_id)).needs_reply is False  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize(
+    ("text", "closing"),
+    [
+        ("thanks bro", True),
+        ("Np, Thanks brother", True),
+        ("thx u man", True),
+        ("thanks bro appreciate it❤️", True),
+        ("ima check", True),
+        ("lemme check pls", True),
+        ("todo bien", True),
+        ("Esta bien", True),
+        ("cancle i figure it out", True),
+        ("tysm", True),
+        ("just i conecct twitch in epic?", False),
+        ("Do i need to claim rewards on the twitch account?", False),
+        ("the account does not work, I already linked it to my epic games", False),
+        ("hello", False),
+        ("ok but it says the account is banned now, can you help me with this", False),
+    ],
+)
+def test_closing_messages(text: str, closing: bool) -> None:
+    assert service.is_courtesy(text) is closing
+
+
+def test_waiting_stops_after_a_day() -> None:
+    now = utcnow()
+    fresh = ChatThread(last_buyer_at=now - timedelta(hours=23), no_reply_needed=False)
+    old = ChatThread(last_buyer_at=now - timedelta(hours=25), no_reply_needed=False)
+    assert fresh.needs_reply and not old.needs_reply
+
+
+async def test_mark_all_as_read(auth_client, session: AsyncSession, chats: Chats) -> None:  # type: ignore[no-untyped-def]
+    await chats.setup(session)
+    for ref in ("B1", "B2"):
+        await chats.order(session, ref, state="paid")
+        chats.say(ref, "is it ready?", at=NOW - timedelta(minutes=1))
+    await chats.scan()
+    base = f"/api/v1/stores/{chats.store_id}/messages"
+    assert (await auth_client.get(f"{base}/summary")).json()["needs_reply"] == 2
+    r = await auth_client.post(f"{base}/handled-all")
+    assert r.json() == {"marked": 2}
+    assert (await auth_client.get(f"{base}/summary")).json()["needs_reply"] == 0

@@ -134,6 +134,23 @@ async def mark_handled(
     return (await _out(session, [thread]))[0]
 
 
+@router.post("/handled-all")
+async def mark_all_handled(store_id: int, auth: OwnerDep, session: SessionDep) -> dict[str, int]:
+    await _store(session, store_id)
+    count = await service.mark_all_handled(session, store_id, auth.actor.label)
+    audit.record(
+        session,
+        auth.actor,
+        "chat.marked_all_handled",
+        entity_type="store",
+        entity_id=store_id,
+        store_id=store_id,
+        after={"conversations": count},
+    )
+    await session.commit()
+    return {"marked": count}
+
+
 @router.post("/scan", status_code=status.HTTP_202_ACCEPTED)
 async def scan_now(store_id: int, auth: OwnerDep, session: SessionDep) -> dict[str, int]:
     await _store(session, store_id)

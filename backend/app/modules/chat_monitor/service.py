@@ -102,14 +102,96 @@ def _normal(text: str) -> str:
     return " ".join(_WORDS.sub(" ", text.lower()).split())
 
 
+# Short closing messages buyers send after the seller's answer ("thanks bro", "ima check",
+# "todo bien"). Matched as whole words in messages of up to 8 words without a question. The
+# owner's own list (Chat monitor → courtesy replies) is added to these.
+COURTESY = (
+    "thanks",
+    "thank you",
+    "thank u",
+    "thanks bro",
+    "thx",
+    "ty",
+    "tysm",
+    "tyvm",
+    "tks",
+    "appreciate",
+    "appreciate it",
+    "appreciated",
+    "np",
+    "no problem",
+    "no worries",
+    "no worrys",
+    "ok",
+    "okay",
+    "okok",
+    "kk",
+    "k",
+    "perfect",
+    "great",
+    "nice",
+    "cool",
+    "awesome",
+    "legit",
+    "love",
+    "best",
+    "got it",
+    "received",
+    "worked",
+    "works",
+    "it works",
+    "done",
+    "ima check",
+    "i will check",
+    "ill check",
+    "let me check",
+    "lemme check",
+    "will check",
+    "i figure it out",
+    "i figured it out",
+    "figured it out",
+    "all good",
+    "good",
+    "gracias",
+    "muchas gracias",
+    "todo bien",
+    "esta bien",
+    "dale",
+    "genial",
+    "perfecto",
+    "listo",
+    "joya",
+    "merci",
+    "danke",
+    "obrigado",
+    "valeu",
+)
+MAX_COURTESY_WORDS = 8
+DONE_STATES = (
+    OrderState.delivered.value,
+    OrderState.completed.value,
+    OrderState.cancelled.value,
+    OrderState.refunded.value,
+)
+
+
+def is_courtesy(text: str, extra: list[str] | tuple[str, ...] = ()) -> bool:
+    if "?" in text:
+        return False
+    words = _normal(text)
+    if not words or len(words.split()) > MAX_COURTESY_WORDS:
+        return False
+    padded = f" {words} "
+    return any((phrase := _normal(p)) and f" {phrase} " in padded for p in (*COURTESY, *extra))
+
+
 def no_reply_needed(
     text: str, state: str | None, settings: ChatMonitorSettings, deliveries: DeliveriesSettings
 ) -> bool:
     """A buyer message nobody has to answer by hand."""
     if classify(text, deliveries.reply_languages) is not Reply.unknown:
         return True  # CONFIRM / CANCEL: the delivery flow answers it
-    done = state in (OrderState.delivered.value, OrderState.completed.value)
-    return done and _normal(text) in {_normal(w) for w in settings.courtesy_replies}
+    return state in DONE_STATES and is_courtesy(text, settings.courtesy_replies)
 
 
 def _urgent(text: str, keywords: list[str]) -> bool:
@@ -279,6 +361,21 @@ async def _process(
         store_id=order.store_id,
     )
     return True
+
+
+async def mark_all_handled(session: AsyncSession, store_id: int, who: str) -> int:
+    """Every conversation now waiting for a reply in the store counts as read."""
+    rows = await session.scalars(
+        select(ChatThread).where(
+            ChatThread.store_id == store_id, ChatThread.last_buyer_at.is_not(None)
+        )
+    )
+    count = 0
+    for thread in rows:
+        if thread.needs_reply:
+            await mark_handled(session, thread, who)
+            count += 1
+    return count
 
 
 async def mark_handled(session: AsyncSession, thread: ChatThread, by: str) -> None:

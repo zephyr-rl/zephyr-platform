@@ -2,7 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Badge, Button, Card, EmptyState } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+} from "@/components/ui";
 import { api, type ChatThread } from "@/lib/api";
 import { useStores } from "@/lib/session";
 
@@ -60,8 +66,11 @@ function Thread({ storeId, thread }: { storeId: number; thread: ChatThread }) {
         <div className="mt-1.5 text-[13px] text-muted">
           {[
             thread.offer_title,
-            thread.order_remote_id && `Order #${thread.order_remote_id.length > 12 ? `${thread.order_remote_id.slice(0, 8)}…` : thread.order_remote_id}`,
-            thread.handled_by && thread.handled_at && `Handled by ${thread.handled_by} ${ago(thread.handled_at)}`,
+            thread.order_remote_id &&
+              `Order #${thread.order_remote_id.length > 12 ? `${thread.order_remote_id.slice(0, 8)}…` : thread.order_remote_id}`,
+            thread.handled_by &&
+              thread.handled_at &&
+              `Handled by ${thread.handled_by} ${ago(thread.handled_at)}`,
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -124,6 +133,10 @@ export function MessagesPage() {
   });
   if (!store || storeId === undefined) return null;
   const rows = threads.data ?? [];
+  const waiting =
+    show === "attention"
+      ? rows.length
+      : rows.filter((r) => r.needs_reply).length;
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
@@ -131,7 +144,8 @@ export function MessagesPage() {
           <h1 className="text-[22px] font-medium">Messages</h1>
           <p className="mt-1 text-muted">
             Buyer messages in {store.name}'s order chats that nobody has
-            answered. Alerts for them go to Discord as set in{" "}
+            answered in the last 24 hours. Thanks and closing messages do not
+            count. Alerts for them go to Discord as set in{" "}
             <Link
               to="/notifications"
               className="text-accent underline-offset-4 hover:underline"
@@ -141,9 +155,35 @@ export function MessagesPage() {
             .
           </p>
         </div>
+        {waiting > 0 && (
+          <ConfirmDialog
+            trigger={<Button className="ml-auto">Mark all as read</Button>}
+            title={`Mark ${waiting === 1 ? "1 conversation" : `${waiting} conversations`} as read?`}
+            description="They stop counting as waiting. A new message from the buyer brings them back."
+            confirmLabel="Mark all as read"
+            onConfirm={async () => {
+              try {
+                const r = await api<{ marked: number }>(
+                  `/stores/${storeId}/messages/handled-all`,
+                  { method: "POST" },
+                );
+                await queryClient.invalidateQueries({
+                  queryKey: ["messages", storeId],
+                });
+                toast.success(
+                  `${r.marked === 1 ? "1 conversation" : `${r.marked} conversations`} marked as read`,
+                );
+              } catch (error) {
+                toast.error("Could not mark them", {
+                  description: (error as Error).message,
+                });
+              }
+            }}
+          />
+        )}
         <Button
           variant="primary"
-          className="ml-auto"
+          className={waiting > 0 ? undefined : "ml-auto"}
           busy={scan.isPending}
           onClick={() => scan.mutate()}
         >

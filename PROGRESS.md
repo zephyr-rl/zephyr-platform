@@ -440,6 +440,21 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
   instructions match, 7 account orders delivered by Eldorado from the vault (restock off on
   both sides), no custom-item orders yet. Kawai and Jewelry: 1 automatic item delivery each,
   same order as the old bot.
+- 2026-11-24: **Messages count closer to Eldorado** (the panel showed 30 waiting in Zephyr, the
+  site none). Eldorado does not expose which chats the seller read (TalkJS messages carry no
+  readBy and the user-conversations endpoint answers 403), so the panel counts "buyer wrote
+  last". Almost all 29 were closing messages after the seller's answer. Owner chose:
+  - closing messages don't count: built-in list (thanks, thx, ty, appreciate, np, ima check,
+    todo bien, esta bien, ...) matched as whole words in messages of up to 8 words without a
+    question, plus the owner's own list; on delivered, completed, cancelled or refunded orders;
+  - a conversation stops counting after 24 h without an answer (still under "All");
+  - "Mark all as read" on Messages (`POST /messages/handled-all`, audited).
+- 2026-11-24: **Rocket Pass check log.** Every check keeps a step log (`rp_checks.log`,
+  migration c5a2d8e6f1b3): each HTTP answer (method, host and path, status and the error
+  fields, never tokens), PsyNet keys source, websocket requests and answers, retries, the
+  final result or the error with its type. Unexpected errors now end the check as failed
+  with the reason instead of leaving it running. "Log" button on each history row, with
+  "Copy log".
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

@@ -214,6 +214,41 @@ class Socket(Protocol):
 
 Connect = Callable[[str, dict[str, str]], Any]  # returns an async context manager of Socket
 Progress = Callable[[str], Awaitable[None]]
+Log = Callable[[str, str], Awaitable[None]]  # (level: info | warn | error, message)
+
+
+async def _no_log(level: str, message: str) -> None:
+    return None
+
+
+def safe_error(data: dict[str, Any]) -> str:
+    """The error fields of a response body, never tokens."""
+    parts: list[str] = []
+    for key in ("errorCode", "errorMessage", "error", "error_description", "message"):
+        value = data.get(key)
+        if isinstance(value, str) and value:
+            parts.append(f"{key}={value}")
+    nested = data.get("Error")
+    if isinstance(nested, dict):
+        parts.extend(f"Error.{k}={nested[k]}" for k in ("Type", "Message") if nested.get(k))
+    return "; ".join(parts)[:300]
+
+
+def _summary(head: str, data: dict[str, Any]) -> str:
+    first = head.splitlines()[0] if head else "response"
+    result = data.get("Result") or {}
+    notes: list[str] = []
+    if isinstance(data.get("Error"), dict):
+        notes.append(f"error {safe_error(data)}")
+    if isinstance(result, dict):
+        if result.get("RocketPassInfo") is not None:
+            info = result["RocketPassInfo"]
+            notes.append(
+                f"pass premium={bool(info.get('bOwnsPremium'))} tier={info.get('TierLevel')}"
+            )
+        if "Products" in result:
+            notes.append(f"{len(result.get('Products') or [])} products claimed")
+    return f"{first}: {', '.join(notes) or 'ok'}"
 
 
 def _ws_connect(url: str, headers: dict[str, str]) -> Any:
@@ -258,6 +293,29 @@ class RocketPassClient:
         self._http = http
         self._connect = connect
         self._sleep = sleep
+        self.log: Log = _no_log
+
+    def watch_http(self) -> None:
+        """Send every HTTP answer (method, host and path, status, error fields) to the log."""
+
+        async def hook(response: httpx.Response) -> None:
+            request = response.request
+            where = f"{request.method} {request.url.host}{request.url.path}"
+            if response.status_code < 400:
+                await self.log("info", f"{where} → HTTP {response.status_code}")
+                return
+            await response.aread()
+            detail = safe_error(_json(response))
+            pending = "authorization_pending" in detail or "slow_down" in detail
+            level = (
+                "info" if pending else "warn" if request.url.host.startswith("psy.") else "error"
+            )
+            await self.log(
+                level,
+                f"{where} → HTTP {response.status_code}" + (f" ({detail})" if detail else ""),
+            )
+
+        self._http.event_hooks["response"] = [*self._http.event_hooks["response"], hook]
 
     # ---- Epic -----------------------------------------------------------------------------
 
@@ -298,7 +356,9 @@ class RocketPassClient:
             data = {}
         feature = str(data.get("featureSet") or "")
         if not feature or not _newer_feature_set(feature, DEFAULT_FEATURE_SET):
+            await self.log("info", f"PsyNet keys: built-in ({DEFAULT_FEATURE_SET})")
             return PsyEnv()
+        await self.log("info", f"PsyNet keys: from the mirror ({feature})")
         return PsyEnv(
             host=str(data.get("host") or DEFAULT_PSY_HOST),
             build_id=str(data.get("buildId") or DEFAULT_BUILD_ID),
@@ -390,6 +450,7 @@ class RocketPassClient:
         env = await self.psy_env()
         auth = await self._auth_player(token, eos, env)
         url = str(auth.get("PerConURLv2") or DEFAULT_WS_URL)
+        await self.log("info", f"Rocket League sign-in OK; opening {url.split('?')[0]}")
         headers = {
             "PsyBuildID": env.build_id,
             "PsyBuildSecret": env.build_secret,
@@ -403,6 +464,7 @@ class RocketPassClient:
         async with self._connect(url, headers) as ws:
 
             async def request(service: str, request_id: str, body: dict[str, Any]) -> None:
+                await self.log("info", f"→ {service} ({request_id})")
                 await ws.send(_frame(service, request_id, body, env.hmac_key))
 
             async def read_until(request_id: str, seconds: float) -> dict[str, Any] | None:
@@ -412,11 +474,13 @@ class RocketPassClient:
                     try:
                         message = await asyncio.wait_for(ws.recv(), left)
                     except TimeoutError:
+                        await self.log("warn", f"No answer to {request_id} after {seconds:.0f} s")
                         return None
                     parsed = _parse(message)
                     if parsed is None:
                         continue
                     head, data = parsed
+                    await self.log("info", f"← {_summary(head, data)}")
                     result = data.get("Result") or {}
                     if "Claim" in head:
                         outcome.claimed_products += len(result.get("Products") or [])

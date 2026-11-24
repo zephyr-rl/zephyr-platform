@@ -122,6 +122,13 @@ async def start(
         )
         check.xbox_expires_at = utcnow() + timedelta(seconds=int(code.get("expires_in") or 900))
         check.progress = "Waiting for you to approve the Microsoft sign-in"
+        check.log = [
+            {
+                "at": utcnow().isoformat(),
+                "level": "info",
+                "message": f"Microsoft code {check.xbox_user_code} shown; waiting for approval",
+            }
+        ]
         await session.flush()
         await jobs.enqueue(
             session,
@@ -168,6 +175,31 @@ async def forget(
 
 
 # ---- jobs ---------------------------------------------------------------------------------
+
+MAX_LOG = 400
+
+
+class RunLog:
+    """The check's step-by-step log, saved on the row as it grows (so a stuck run shows too)."""
+
+    def __init__(self, sessionmaker: async_sessionmaker[AsyncSession], check_id: int) -> None:
+        self._sessionmaker = sessionmaker
+        self._check_id = check_id
+        self.entries: list[dict[str, Any]] = []
+
+    async def load(self) -> None:
+        async with self._sessionmaker() as session:
+            check = await session.get(PassCheck, self._check_id)
+            self.entries = list(check.log or []) if check is not None else []
+
+    async def __call__(self, level: str, message: str) -> None:
+        self.entries.append({"at": utcnow().isoformat(), "level": level, "message": message[:500]})
+        if len(self.entries) > MAX_LOG:
+            self.entries = self.entries[:50] + self.entries[-(MAX_LOG - 50) :]
+        async with self._sessionmaker() as session, session.begin():
+            check = await session.get(PassCheck, self._check_id)
+            if check is not None:
+                check.log = list(self.entries)
 
 
 async def _finish(
@@ -222,12 +254,50 @@ async def run_check(
             else None
         )
 
+    log = RunLog(sessionmaker, check_id)
+    await log.load()
+    client.log = log
+    client.watch_http()
+    await log("info", f"Started: {kind.value}")
+
     async def progress(text: str) -> None:
+        await log("info", text)
         async with sessionmaker() as s, s.begin():
             row = await s.get(PassCheck, check_id)
             if row is not None:
                 row.progress = text[:200]
 
+    try:
+        return await _run(
+            sessionmaker,
+            secrets,
+            client,
+            check_id,
+            kind,
+            epic_id,
+            refresh,
+            xbox_refresh,
+            progress,
+            log,
+        )
+    except Exception as exc:  # anything unexpected must end the check, with the reason
+        reason = f"Unexpected error: {type(exc).__name__}: {exc}"[:500]
+        await log("error", reason)
+        await _finish(sessionmaker, check_id, state=CheckState.failed, error=reason)
+
+
+async def _run(
+    sessionmaker: async_sessionmaker[AsyncSession],
+    secrets: Any,
+    client: RocketPassClient,
+    check_id: int,
+    kind: CheckKind,
+    epic_id: str,
+    refresh: str,
+    xbox_refresh: str | None,
+    progress: Callable[[str], Any],
+    log: RunLog,
+) -> None:
     try:
         token = await client.refresh(refresh)
     except SessionExpired as exc:
@@ -237,11 +307,14 @@ async def run_check(
             )
             if account is not None:
                 account.refresh_token = None
+        await log("error", f"Epic session: {exc}")
         await _finish(sessionmaker, check_id, state=CheckState.failed, error=str(exc))
         return
     except (RocketPassError, httpx.HTTPError) as exc:
+        await log("error", _detail(exc))
         await _finish(sessionmaker, check_id, state=CheckState.failed, error=_message(exc))
         return
+    await log("info", f"Signed in to Epic as {token.display_name}")
     async with (
         sessionmaker() as session,
         session.begin(),
@@ -273,9 +346,15 @@ async def run_check(
         )
         outcome = await client.check(token, claim=kind is not CheckKind.check, progress=progress)
     except (RocketPassError, httpx.HTTPError, OSError, TimeoutError) as exc:
+        await log("error", _detail(exc))
         await _finish(sessionmaker, check_id, state=CheckState.failed, error=_message(exc))
         return
     assert outcome.info is not None
+    await log(
+        "info",
+        f"Done: premium={outcome.info.has_premium}, tier {outcome.info.tier}, "
+        f"{outcome.claimed_products} products claimed, {outcome.attempts} attempts",
+    )
     result.update(outcome.info.to_dict())
     result["claimed_products"] = outcome.claimed_products
     result["newly_activated"] = outcome.newly_activated
@@ -317,9 +396,13 @@ async def wait_for_xbox(
             error="The Microsoft code expired before it was approved. Start again.",
         )
         return
+    log = RunLog(sessionmaker, check_id)
+    await log.load()
+    client.log = log
     try:
         tokens = await client.xbox_poll(device)
     except (RocketPassError, httpx.HTTPError) as exc:
+        await log("error", f"Microsoft sign-in: {_detail(exc)}")
         await _finish(sessionmaker, check_id, state=CheckState.failed, error=_message(exc))
         return
     if tokens is None:
@@ -333,8 +416,17 @@ async def wait_for_xbox(
             str(tokens.get("refresh_token") or ""), context=_xbox_ctx(epic_id)
         )
         check.state, check.progress = CheckState.queued, "Microsoft sign-in approved"
+        check.log = [
+            *log.entries,
+            {"at": utcnow().isoformat(), "level": "info", "message": "Microsoft sign-in approved"},
+        ]
         check.xbox_device_code = None
         await jobs.enqueue(session, RUN_JOB, {"check_id": check_id}, max_attempts=1)
+
+
+def _detail(exc: BaseException) -> str:
+    """For the log: the exception type and its message (no tokens are ever in these)."""
+    return f"{type(exc).__name__}: {exc}"[:500]
 
 
 def _message(exc: BaseException) -> str:

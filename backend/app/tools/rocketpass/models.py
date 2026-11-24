@@ -64,3 +64,7 @@ class PassCheck(TimestampMixin, Base):
     xbox_device_code: Mapped[str | None] = mapped_column(Text)
     xbox_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Step-by-step record of the run, to see why a check failed: [{at, level, message}].
+    log: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )

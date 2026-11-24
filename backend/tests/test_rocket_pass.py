@@ -403,3 +403,71 @@ async def test_api_flow(
     # The history stays, without the account link.
     after = (await auth_client.get("/api/v1/tools/rocket-pass/checks")).json()
     assert [h["epic_account_id"] for h in after if h["id"] == check["id"]] == [None]
+
+
+async def test_failed_check_keeps_a_log(
+    session: AsyncSession, platform: Platform, fakes: tuple[FakeEpic, FakePsyNet]
+) -> None:
+    epic, _ = fakes
+    client = service.client_factory(httpx.AsyncClient())
+    account = await service.sign_in(session, platform.secrets, ACTOR, client, CODE)
+    ok = await service.start(session, platform.secrets, ACTOR, client, account.id, CheckKind.check)
+    await session.commit()
+    await _run_jobs(platform)
+    await session.refresh(ok)
+    lines = [e["message"] for e in ok.log]
+    assert lines[0] == "Started: check"
+    assert any(
+        "account-public-service-prod.ol.epicgames.com" in m and "HTTP 200" in m for m in lines
+    )
+    assert any(m.startswith("→ RocketPass/GetPlayerInfo v2") for m in lines)
+    assert any("pass premium=False tier=42" in m for m in lines)
+    assert lines[-1].startswith("Done: premium=False")
+    assert not any("epic-access" in m or "epic-refresh" in m or "eos-access" in m for m in lines)
+
+    # PsyNet refuses the sign-in: the log has the HTTP status and the error fields.
+    original = epic.handler
+
+    def refusing(request: httpx.Request) -> httpx.Response:
+        if str(request.url).endswith("/rpc/Auth/AuthPlayer/v2"):
+            return httpx.Response(
+                401, json={"Error": {"Type": "InvalidAuthTicket", "Message": "bad"}}
+            )
+        return original(request)
+
+    epic.handler = refusing  # type: ignore[method-assign]
+    bad = await service.start(session, platform.secrets, ACTOR, client, account.id, CheckKind.check)
+    await session.commit()
+    await _run_jobs(platform)
+    await session.refresh(bad)
+    assert bad.state is CheckState.failed and "InvalidAuthTicket" in (bad.error or "")
+    errors = [e for e in bad.log if e["level"] == "error"]
+    assert any(
+        "HTTP 401" in e["message"] and "Error.Type=InvalidAuthTicket" in e["message"]
+        for e in errors
+    )
+    assert errors[-1]["message"].startswith("RocketPassError:")
+
+
+async def test_unexpected_error_ends_the_check(
+    session: AsyncSession,
+    platform: Platform,
+    fakes: tuple[FakeEpic, FakePsyNet],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = service.client_factory(httpx.AsyncClient())
+    account = await service.sign_in(session, platform.secrets, ACTOR, client, CODE)
+    check = await service.start(
+        session, platform.secrets, ACTOR, client, account.id, CheckKind.check
+    )
+    await session.commit()
+
+    async def broken(*args: object, **kwargs: object) -> None:
+        raise KeyError("PerConURLv2")
+
+    monkeypatch.setattr(rp.RocketPassClient, "check", broken)
+    await _run_jobs(platform)
+    await session.refresh(check)
+    assert check.state is CheckState.failed
+    assert check.error == "Unexpected error: KeyError: 'PerConURLv2'"
+    assert check.log[-1] == {**check.log[-1], "level": "error", "message": check.error}
