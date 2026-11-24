@@ -11,6 +11,7 @@ import {
   Card,
   ConfirmDialog,
   EmptyState,
+  Modal,
   TextAreaField,
 } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -60,6 +61,9 @@ interface PassCheck {
 }
 
 const BASE = "/tools/rocket-pass";
+// The Epic login that returns the authorization code (Epic Games Launcher client).
+const EPIC_LOGIN_URL =
+  "https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D34a02cf8f4414e29b15921876da36f9a%26responseType%3Dcode";
 const dateTime = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
   timeStyle: "short",
@@ -95,6 +99,162 @@ function PassSummary({ result }: { result: PassResult }) {
   );
 }
 
+/** A button that copies a text and shows "Copied" for a moment. */
+function CopyButton({
+  text,
+  label,
+  size,
+}: {
+  text: string;
+  label: string;
+  size?: "sm";
+}) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = window.setTimeout(() => setCopied(false), 1800);
+    return () => window.clearTimeout(t);
+  }, [copied]);
+  return (
+    <Button
+      type="button"
+      size={size}
+      variant={copied ? "selected" : "secondary"}
+      aria-live="polite"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+        } catch {
+          toast.error("Could not copy", {
+            description: "The browser blocked the clipboard.",
+          });
+        }
+      }}
+    >
+      {copied ? (
+        <span className="inline-flex items-center gap-1.5 text-success">
+          <svg
+            aria-hidden="true"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M5 12.5l4.5 4.5L19 7.5" />
+          </svg>
+          Copied
+        </span>
+      ) : (
+        label
+      )}
+    </Button>
+  );
+}
+
+const RULE = "-".repeat(62);
+
+function seasonEnd(iso: string | null): string {
+  if (!iso) return "Unknown";
+  const target = new Date(iso);
+  const date = `${target.toISOString().replace("T", " ").slice(0, 19)} UTC`;
+  const diff = Math.floor((target.getTime() - Date.now()) / 1000);
+  if (diff <= 0) return `${date} (Season Ended)`;
+  const days = Math.floor(diff / 86400);
+  const hours = Math.floor((diff % 86400) / 3600);
+  const minutes = Math.floor((diff % 3600) / 60);
+  const parts = [
+    ...(days > 0 ? [`${days}d`] : []),
+    ...(hours > 0 || days > 0 ? [`${hours}h`] : []),
+    `${minutes}m`,
+  ];
+  return `${date} (in ${parts.join(" ")})`;
+}
+
+/** The old checker's text report, line by line. */
+function reportLines(
+  account: EpicAccount,
+  r: PassResult,
+  claimed: boolean,
+): { text: string; claim: boolean }[] {
+  const xp = r.xp_boost_percent;
+  return [
+    { text: `Account Display Name : ${account.display_name}`, claim: false },
+    { text: `Epic Account ID      : ${account.account_id}`, claim: false },
+    { text: RULE, claim: false },
+    ...(claimed
+      ? [
+          {
+            text: "🎉 Entitlement Claim  : ✅ ACTIVATED VIA FORTNITE CREW SYNC!",
+            claim: true,
+          },
+        ]
+      : []),
+    {
+      text: `🎫 Rocket Pass Status : ${r.has_premium ? "✅ ACTIVE (PREMIUM PASS OWNED)" : "❌ INACTIVE (FREE TIER ONLY)"}`,
+      claim: false,
+    },
+    { text: `🏆 Current Tier Level : Tier ${r.tier}`, claim: false },
+    {
+      text: `⚡ XP Boost Multiplier: +${xp}% (${(1 + xp / 100).toFixed(2)}x XP)`,
+      claim: false,
+    },
+    {
+      text: `📊 Progress           : ${r.pips} Pips (${r.pips_per_level} Pips/Tier)`,
+      claim: false,
+    },
+    {
+      text: `⏳ Season End Date    : ${seasonEnd(r.season_ends_at)}`,
+      claim: false,
+    },
+  ];
+}
+
+function PassReport({
+  account,
+  claimed,
+  onClose,
+}: {
+  account: EpicAccount;
+  claimed: boolean;
+  onClose: () => void;
+}) {
+  const r = account.last_result;
+  if (!r) return null;
+  const lines = reportLines(account, r, claimed);
+  const copy = lines
+    .filter((l) => !l.claim)
+    .map((l) => l.text)
+    .join("\n");
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={`Rocket Pass · ${account.display_name}`}
+      wide
+    >
+      <pre className="overflow-x-auto rounded-md border border-line bg-bg p-4 font-mono text-[12.5px] leading-6 whitespace-pre">
+        {lines.map((l) => l.text).join("\n")}
+      </pre>
+      <div className="flex items-center gap-3">
+        <span className="text-[12px] text-muted">
+          The copy leaves out the Entitlement Claim line
+        </span>
+        <span className="ml-auto flex gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+          <CopyButton text={copy} label="Copy text" />
+        </span>
+      </div>
+    </Modal>
+  );
+}
+
 function SignIn({ onStarted }: { onStarted: (c: PassCheck) => void }) {
   const queryClient = useQueryClient();
   const [code, setCode] = useState("");
@@ -121,6 +281,9 @@ function SignIn({ onStarted }: { onStarted: (c: PassCheck) => void }) {
           add.mutate();
         }}
       >
+        <div>
+          <CopyButton text={EPIC_LOGIN_URL} label="Copy Epic login link" />
+        </div>
         <TextAreaField
           label="Authorization code or JSON"
           hint="The 32-character code, or the whole JSON with “authorizationCode”."
@@ -202,12 +365,15 @@ function AccountRow({
   account,
   busy,
   start,
+  claimed,
 }: {
   account: EpicAccount;
   busy: boolean;
   start: (kind: Kind) => void;
+  claimed: boolean;
 }) {
   const queryClient = useQueryClient();
+  const [report, setReport] = useState(false);
   const forget = async (xboxOnly: boolean) => {
     try {
       await api(
@@ -250,6 +416,11 @@ function AccountRow({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {account.last_result?.has_premium && (
+          <Button size="sm" variant="primary" onClick={() => setReport(true)}>
+            Show report
+          </Button>
+        )}
         <Button
           size="sm"
           disabled={busy || !account.signed_in}
@@ -297,6 +468,13 @@ function AccountRow({
           onConfirm={() => forget(false)}
         />
       </div>
+      {report && (
+        <PassReport
+          account={account}
+          claimed={claimed}
+          onClose={() => setReport(false)}
+        />
+      )}
     </li>
   );
 }
@@ -390,6 +568,11 @@ export function RocketPassPage() {
                     (start.isPending && start.variables?.id === a.id)
                   }
                   start={(kind) => start.mutate({ id: a.id, kind })}
+                  claimed={(checks.data ?? []).some(
+                    (c) =>
+                      c.epic_account_id === a.id &&
+                      c.result?.newly_activated === true,
+                  )}
                 />
               ))}
             </ul>
