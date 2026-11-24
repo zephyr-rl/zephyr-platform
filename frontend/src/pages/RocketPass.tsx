@@ -175,61 +175,31 @@ function seasonEnd(iso: string | null): string {
   return `${date} (in ${parts.join(" ")})`;
 }
 
-/** The old checker's text report, line by line. */
-function reportLines(
-  account: EpicAccount,
-  r: PassResult,
-  claimed: boolean,
-): { text: string; claim: boolean }[] {
+/** The old checker's text report. */
+function reportText(account: EpicAccount, r: PassResult): string {
   const xp = r.xp_boost_percent;
   return [
-    { text: `Account Display Name : ${account.display_name}`, claim: false },
-    { text: `Epic Account ID      : ${account.account_id}`, claim: false },
-    { text: RULE, claim: false },
-    ...(claimed
-      ? [
-          {
-            text: "🎉 Entitlement Claim  : ✅ ACTIVATED VIA FORTNITE CREW SYNC!",
-            claim: true,
-          },
-        ]
-      : []),
-    {
-      text: `🎫 Rocket Pass Status : ${r.has_premium ? "✅ ACTIVE (PREMIUM PASS OWNED)" : "❌ INACTIVE (FREE TIER ONLY)"}`,
-      claim: false,
-    },
-    { text: `🏆 Current Tier Level : Tier ${r.tier}`, claim: false },
-    {
-      text: `⚡ XP Boost Multiplier: +${xp}% (${(1 + xp / 100).toFixed(2)}x XP)`,
-      claim: false,
-    },
-    {
-      text: `📊 Progress           : ${r.pips} Pips (${r.pips_per_level} Pips/Tier)`,
-      claim: false,
-    },
-    {
-      text: `⏳ Season End Date    : ${seasonEnd(r.season_ends_at)}`,
-      claim: false,
-    },
-  ];
+    `Account Display Name : ${account.display_name}`,
+    `Epic Account ID      : ${account.account_id}`,
+    RULE,
+    `🎫 Rocket Pass Status : ${r.has_premium ? "✅ ACTIVE (PREMIUM PASS OWNED)" : "❌ INACTIVE (FREE TIER ONLY)"}`,
+    `🏆 Current Tier Level : Tier ${r.tier}`,
+    `⚡ XP Boost Multiplier: +${xp}% (${(1 + xp / 100).toFixed(2)}x XP)`,
+    `📊 Progress           : ${r.pips} Pips (${r.pips_per_level} Pips/Tier)`,
+    `⏳ Season End Date    : ${seasonEnd(r.season_ends_at)}`,
+  ].join("\n");
 }
 
 function PassReport({
   account,
-  claimed,
   onClose,
 }: {
   account: EpicAccount;
-  claimed: boolean;
   onClose: () => void;
 }) {
   const r = account.last_result;
   if (!r) return null;
-  const lines = reportLines(account, r, claimed);
-  const copy = lines
-    .filter((l) => !l.claim)
-    .map((l) => l.text)
-    .join("\n");
+  const text = reportText(account, r);
   return (
     <Modal
       open
@@ -238,18 +208,13 @@ function PassReport({
       wide
     >
       <pre className="overflow-x-auto rounded-md border border-line bg-bg p-4 font-mono text-[12.5px] leading-6 whitespace-pre">
-        {lines.map((l) => l.text).join("\n")}
+        {text}
       </pre>
-      <div className="flex items-center gap-3">
-        <span className="text-[12px] text-muted">
-          The copy leaves out the Entitlement Claim line
-        </span>
-        <span className="ml-auto flex gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            Close
-          </Button>
-          <CopyButton text={copy} label="Copy text" />
-        </span>
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onClose}>
+          Close
+        </Button>
+        <CopyButton text={text} label="Copy text" />
       </div>
     </Modal>
   );
@@ -365,12 +330,10 @@ function AccountRow({
   account,
   busy,
   start,
-  claimed,
 }: {
   account: EpicAccount;
   busy: boolean;
   start: (kind: Kind) => void;
-  claimed: boolean;
 }) {
   const queryClient = useQueryClient();
   const [report, setReport] = useState(false);
@@ -469,11 +432,7 @@ function AccountRow({
         />
       </div>
       {report && (
-        <PassReport
-          account={account}
-          claimed={claimed}
-          onClose={() => setReport(false)}
-        />
+        <PassReport account={account} onClose={() => setReport(false)} />
       )}
     </li>
   );
@@ -568,11 +527,6 @@ export function RocketPassPage() {
                     (start.isPending && start.variables?.id === a.id)
                   }
                   start={(kind) => start.mutate({ id: a.id, kind })}
-                  claimed={(checks.data ?? []).some(
-                    (c) =>
-                      c.epic_account_id === a.id &&
-                      c.result?.newly_activated === true,
-                  )}
                 />
               ))}
             </ul>

@@ -433,9 +433,9 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     the old project (no "Open Epic sign-in" button or steps).
   - "Copy Epic login link" (copies the launcher login URL without showing it; the button turns
     into "Copied"). "Show report" on accounts with the premium pass: the old checker's text
-    (display name, account id, claim line when a claim activated it, status, tier, XP boost,
-    pips, season end "YYYY-MM-DD HH:MM:SS UTC (in Xd Yh Zm)"); "Copy text" leaves out the
-    Entitlement Claim line.
+    (display name, account id, status, tier, XP boost, pips, season end
+    "YYYY-MM-DD HH:MM:SS UTC (in Xd Yh Zm)") and "Copy text". Never the Entitlement Claim line
+    (owner's choice).
 - 2026-11-24: Shadow check day 1 of 3 (24 h): no differences in any store. Zephyr: 7 top-up
   instructions match, 7 account orders delivered by Eldorado from the vault (restock off on
   both sides), no custom-item orders yet. Kawai and Jewelry: 1 automatic item delivery each,
