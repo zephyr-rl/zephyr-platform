@@ -20,6 +20,7 @@ from app.api.v1 import (
     orders,
     reminders,
     reports,
+    rocket_pass,
     search,
     stock,
     stores,
@@ -66,6 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(timezones.router)
     api.include_router(listing_groups.router)
     api.include_router(notifications.router)
+    api.include_router(rocket_pass.router)
     for router in platform.module_context.routers:
         api.include_router(router)
     app.include_router(api)

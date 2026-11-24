@@ -418,6 +418,17 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
     owner had decided it stays off. Now off (interval 1 min kept; audit actor
     `claude:owner-asked-off`). The importer now only sets the switch and interval on the first
     import. Restock state: Zephyr off, Kawai off, Jewelry on (every 2 min).
+- 2026-11-24: **Tools → Rocket Pass check** (the owner's RocketPassChecker, rewritten in Python).
+  - Owner only, not tied to a store. Add an Epic account by pasting the authorization code (or
+    the page text / URL); its session is kept encrypted (`rp-epic:` context) and refreshed on
+    every use (Epic rotates refresh tokens). "Forget" deletes it; history stays.
+  - Check (read the pass), Claim Fortnite Crew pass (claims and retries every 2 s for up to
+    60 attempts), Xbox sync (Microsoft device code the first time, shown in the panel; the
+    Xbox sign-in is then kept encrypted, `rp-xbox:`). Checks run as jobs; the page follows them.
+  - Uses the games' private APIs (Epic launcher client, EOS, PsyNet websocket, Xbox Live), and
+    the PsyNet keys from psy.jaren.wtf with built-in fallbacks, like the original script.
+  - Tables rp_epic_accounts / rp_checks (migration b3e9c1d7a4f2); dependency `websockets`.
+    Tests: tests/test_rocket_pass.py (protocol fakes, jobs, Xbox wait, API).
 
 ## Notes
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off

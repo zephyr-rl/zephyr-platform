@@ -72,6 +72,12 @@ export const icons = {
       <path d="M10 20a2 2 0 0 0 4 0" />
     </Icon>
   ),
+  ticket: (
+    <Icon>
+      <path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z" />
+      <path d="M14 5v2M14 11v2M14 17v2" />
+    </Icon>
+  ),
   settings: (
     <Icon>
       <circle cx="12" cy="12" r="3" />

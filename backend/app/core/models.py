@@ -19,11 +19,13 @@ from app.stock.models import (
     StockPool,
 )
 from app.stores.models import MarketplaceConnection, Store, StoreModule
+from app.tools.rocketpass.models import EpicAccount, PassCheck
 
 __all__ = [
     "AuditLog",
     "ChatThread",
     "DailyReport",
+    "EpicAccount",
     "Fulfilment",
     "FulfilmentEvent",
     "Job",
@@ -35,6 +37,7 @@ __all__ = [
     "NotificationRule",
     "Order",
     "OutboxEvent",
+    "PassCheck",
     "Reservation",
     "ReviewReminder",
     "StockExtraction",

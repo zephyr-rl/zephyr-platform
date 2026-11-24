@@ -36,6 +36,9 @@ class Platform:
         from app.notifications import service as notifications
 
         notifications.register(self)
+        from app.tools.rocketpass import service as rocketpass
+
+        rocketpass.register(self)
 
 
 def build_connector_registry() -> ConnectorRegistry:

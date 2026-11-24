@@ -85,6 +85,8 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
       {NAV.map((item) => (
         <NavLink key={item.to} {...item} onClick={onNavigate} count={counts[item.to]} />
       ))}
+      <p className="px-2.5 pt-6 pb-2 text-[12px] text-muted">Tools</p>
+      <NavLink to="/tools/rocket-pass" label="Rocket Pass check" icon={icons.ticket} onClick={onNavigate} />
       <div className="mt-auto">
         <NavLink to="/settings" label="Settings" icon={icons.settings} onClick={onNavigate} />
       </div>
