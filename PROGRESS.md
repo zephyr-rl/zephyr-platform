@@ -477,3 +477,13 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
   - 17645779: the platform would have asked for CONFIRM; the buyer wrote "Congirm", opened a dispute, and the order was delivered by hand. Not a bot delivery on the old side.
 - Jewelry: 1 delivery the same; restock differs because both systems check the same vaults every 2 minutes (old checkInterval 120 s, platform interval 2) and only the first to see a gap fills it. The platform's one upload (273d7e16 at 23:26:03 UTC) matches the old bot's at 23:26:47; the old bot got there first the other 4 times. All 3 listings show Vault 5/5 on the platform.
 - No platform faults found. Zephyr meets the 3-day condition for its cut-over.
+
+## 2026-11-26 22:25 UTC — Zephyr cut-over: live on the platform
+
+- Old vs new comparison (scripts/cutover/cutover_diff.py: re-runs the items, restock and settings importers in one rolled-back transaction and diffs the platform before/after): 1 difference only, the new `language_clarification` text, which the old bot does not have. By design: Discord titles in English, orders read every 60 s (old: 20 s), restock off (owner's choice).
+- Stock: 19 pools, 5,530 accounts, counts reconcile; 10 accounts taken out in the old system synced as removed.
+- No order was half-handled: the old bot's 52 pending-confirmation records were all delivered or cancelled; no open order had a shadow fulfilment. Only c485d707 (in dispute since 11/24) is open, untouched by both.
+- With the owner's explicit OK: `Eldorado-ZephyrStore` stopped and set to Manual start; final `migrate-legacy --sync-removed`; Zephyr's shadow mode turned off (scripts/cutover/shadow_off.py, audited as `claude:cutover-owner-ok`).
+- Checked after: orders.poll, deliveries.check_replies, chat_monitor.scan and reports.daily run without errors and no shadow.* decision is recorded for Zephyr. Kawai and Jewelry stay in shadow.
+- Known gap for the next cut-overs: a paid order that already has a shadow (simulated) fulfilment is not taken over when shadow ends. Check for those right after turning shadow off (shadow_off.py lists them).
+- To do: rotate Zephyr's Eldorado credentials (the old bot's copy still holds them).
