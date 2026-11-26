@@ -4,26 +4,38 @@ Snapshots the platform, runs the three settings importers inside one transaction
 turned into flushes, snapshots again, prints the differences and rolls everything back.
 Nothing is saved, nothing is sent (Discord transport refuses every request).
 """
-import asyncio, json, sys
+
+import asyncio
+import json
 from pathlib import Path
 
 import httpx
 from sqlalchemy import select
 
-from app.core.config import get_settings
 from app.core.audit import Actor
+from app.core.config import get_settings
 from app.core.platform import build_platform
+from app.legacy.items import migrate_items
+from app.legacy.restock import migrate_restock
+from app.legacy.settings import migrate_settings
 from app.listings.models import Listing, ListingGroup
 from app.notifications import discord
 from app.notifications.models import NotificationRule
 from app.stores.models import Store, StoreModule
-from app.legacy.items import migrate_items
-from app.legacy.restock import migrate_restock
-from app.legacy.settings import migrate_settings
 
 FOLDER = Path(r"C:\EldoradoBots\Eldorado API - ZephyrStore")
-SKIP = {"updated_at", "created_at", "last_restock_at", "last_restock_note", "vault_count",
-        "last_synced_at", "synced_at", "remote_state", "price_amount", "stock_count"}
+SKIP = {
+    "updated_at",
+    "created_at",
+    "last_restock_at",
+    "last_restock_note",
+    "vault_count",
+    "last_synced_at",
+    "synced_at",
+    "remote_state",
+    "price_amount",
+    "stock_count",
+}
 
 
 def _refuse(request: httpx.Request) -> httpx.Response:
@@ -47,11 +59,13 @@ async def snap(session, store_id):
     data = {}
     for m in await session.scalars(select(StoreModule).where(StoreModule.store_id == store_id)):
         data[f"module {m.module_key}"] = {"enabled": m.enabled, **(m.settings or {})}
-    for l in await session.scalars(select(Listing).where(Listing.store_id == store_id)):
-        data[f"listing {l.id} {l.title[:45]}"] = row(l)
+    for lst in await session.scalars(select(Listing).where(Listing.store_id == store_id)):
+        data[f"listing {lst.id} {lst.title[:45]}"] = row(lst)
     for g in await session.scalars(select(ListingGroup).where(ListingGroup.store_id == store_id)):
         data[f"card {g.id} {g.title[:45]}"] = row(g)
-    for r in await session.scalars(select(NotificationRule).where(NotificationRule.store_id == store_id)):
+    for r in await session.scalars(
+        select(NotificationRule).where(NotificationRule.store_id == store_id)
+    ):
         d = row(r)
         d.pop("channel_id", None)
         data[f"rule {r.id} {r.event_type}"] = d
@@ -93,7 +107,9 @@ async def main():
         for f in sorted(set(b) | set(a)):
             if b.get(f) != a.get(f):
                 n += 1
-                print(f"* {key} / {f}\n    platform now: {short(b.get(f))}\n    old system:   {short(a.get(f))}")
+                print(
+                    f"* {key} / {f}\n    platform now: {short(b.get(f))}\n    old system:   {short(a.get(f))}"
+                )
     print(f"\n{n} difference(s)")
 
 
