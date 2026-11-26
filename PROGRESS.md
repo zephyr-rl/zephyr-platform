@@ -468,3 +468,12 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
 - `_read_replies`: a French or Italian keyword sends the new Deliveries text `language_clarification` once (asks for CONFIRM or CANCEL in English), adds the note `language_clarification_sent`, and raises the "Delivery needs you" alert saying the order is still waiting. Nothing is delivered or cancelled. A later English CONFIRM / CANCEL works as usual. A second French/Italian reply moves the order to needs-attention with an alert.
 - The new text counts as an automated message (not the seller writing) in deliveries and the chat monitor.
 - Tests: 3 new in tests/test_deliveries.py; 344 pass.
+
+## 2026-11-26 — Shadow comparison, full 76 h (2026-11-23 18:12 to 2026-11-26 22:12 UTC)
+
+- Zephyr: the same. 6 deliveries, 21 top-up instructions, 0 vault uploads (restock off in both systems, by the owner).
+- Kawai: 2 the same, 2 explained:
+  - 39aa9f77: the old bot asked, the buyer confirmed and it delivered within 21 s (16:37:34 to 16:37:55 UTC); the platform's next read was 16:38:01 and saw it delivered. Only possible while both run.
+  - 17645779: the platform would have asked for CONFIRM; the buyer wrote "Congirm", opened a dispute, and the order was delivered by hand. Not a bot delivery on the old side.
+- Jewelry: 1 delivery the same; restock differs because both systems check the same vaults every 2 minutes (old checkInterval 120 s, platform interval 2) and only the first to see a gap fills it. The platform's one upload (273d7e16 at 23:26:03 UTC) matches the old bot's at 23:26:47; the old bot got there first the other 4 times. All 3 listings show Vault 5/5 on the platform.
+- No platform faults found. Zephyr meets the 3-day condition for its cut-over.
