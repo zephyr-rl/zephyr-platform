@@ -460,3 +460,11 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
 - New stores start in **shadow mode**: nothing is sent to a marketplace until it is turned off
   (with a confirmation dialog).
 - Only the fake (testing) marketplace exists until Stage 4.
+
+## 2026-11-26 — French and Italian CONFIRM / CANCEL replies: clarify only
+
+- Owner's decision: no typo tolerance for CONFIRM / CANCEL ("Congirm" stays unclear); keywords in French or Italian are clarified, never acted on.
+- `deliveries/replies.py`: `FOREIGN_KEYWORDS` (French, Italian) and `foreign_language(text)`. Whole words only, at most 6 words, no "?". Only checked when the English/Spanish reading is unclear.
+- `_read_replies`: a French or Italian keyword sends the new Deliveries text `language_clarification` once (asks for CONFIRM or CANCEL in English), adds the note `language_clarification_sent`, and raises the "Delivery needs you" alert saying the order is still waiting. Nothing is delivered or cancelled. A later English CONFIRM / CANCEL works as usual. A second French/Italian reply moves the order to needs-attention with an alert.
+- The new text counts as an automated message (not the seller writing) in deliveries and the chat monitor.
+- Tests: 3 new in tests/test_deliveries.py; 344 pass.

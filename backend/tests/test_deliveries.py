@@ -627,3 +627,49 @@ async def test_orders_api(auth_client, session: AsyncSession, shop: Shop) -> Non
     detail = (await auth_client.get(f"{base}/{attention[0]['id']}")).json()
     assert detail["fulfilment_state"] == "done"
     assert (await auth_client.post(f"{base}/poll")).status_code == 202
+
+
+async def test_french_or_italian_keyword_only_asks_for_english(
+    session: AsyncSession, shop: Shop, platform: Platform
+) -> None:
+    await _awaiting_buyer(session, shop)
+    shop.buyer_says("je confirme")
+    await service.check_replies(platform, shop.store_id)
+    assert "reply with exactly one word in English" in shop.seller_messages()[-1]
+    f = await shop.fulfilment(session)
+    assert f.state is FulfilmentState.awaiting_buyer
+    assert not f.clarification_sent
+    assert shop.market.deliveries == []
+
+    shop.buyer_says("CONFIRM")
+    await service.check_replies(platform, shop.store_id)
+    await shop.run_jobs()
+    assert (await shop.fulfilment(session)).state is FulfilmentState.done
+
+
+async def test_repeated_italian_cancel_goes_to_a_person_without_cancelling(
+    session: AsyncSession, shop: Shop, platform: Platform
+) -> None:
+    await _awaiting_buyer(session, shop)
+    shop.buyer_says("annulla")
+    await service.check_replies(platform, shop.store_id)
+    shop.buyer_says("annulla per favore")
+    await service.check_replies(platform, shop.store_id)
+    f = await shop.fulfilment(session)
+    assert f.state is FulfilmentState.needs_attention
+    assert len(shop.seller_messages()) == 2  # the confirmation ask and one language ask
+    assert shop.market.deliveries == []
+
+
+def test_foreign_keywords_have_no_typo_tolerance() -> None:
+    from app.modules.deliveries.replies import Reply, classify, foreign_language
+
+    assert foreign_language("Je confirme") == "French"
+    assert foreign_language("annuler svp") == "French"
+    assert foreign_language("conferma") == "Italian"
+    assert foreign_language("rimborso grazie") == "Italian"
+    assert foreign_language("Congirm") is None
+    assert foreign_language("confrma") is None
+    assert foreign_language("je confirme?") is None
+    assert classify("Congirm", ["en", "es"]) is Reply.unknown
+    assert classify("conferma", ["en", "es"]) is Reply.unknown

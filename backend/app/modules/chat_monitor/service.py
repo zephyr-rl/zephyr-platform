@@ -76,6 +76,7 @@ async def _our_messages(session: AsyncSession, store_id: int, cfg: DeliveriesSet
         cfg.confirmation_single,
         cfg.confirmation_multi,
         cfg.clarification,
+        cfg.language_clarification,
         cfg.cancellation,
     ]
     ours += [

@@ -20,6 +20,7 @@ from app.modules.deliveries.messages import (
     DEFAULT_CONFIRMATION_MULTI,
     DEFAULT_CONFIRMATION_SINGLE,
     DEFAULT_DELIVERY_MESSAGE,
+    DEFAULT_LANGUAGE_CLARIFICATION,
     DEFAULT_TOPUP_INSTRUCTIONS,
 )
 
@@ -63,6 +64,15 @@ class DeliveriesSettings(_Settings):
         min_length=1,
         max_length=4000,
         description="Sent once when the buyer's reply is not a clear CONFIRM or CANCEL.",
+    )
+    language_clarification: str = Field(
+        DEFAULT_LANGUAGE_CLARIFICATION,
+        min_length=1,
+        max_length=4000,
+        description=(
+            "Sent once when the buyer answers CONFIRM or CANCEL in French or Italian. "
+            "Nothing is delivered or cancelled because of that reply."
+        ),
     )
     cancellation: str = Field(
         DEFAULT_CANCELLATION,

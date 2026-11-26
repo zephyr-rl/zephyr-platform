@@ -54,6 +54,13 @@ DEFAULT_CONFIRMATION_MULTI = (
     "(Note: Once account credentials are delivered, orders cannot be refunded)."
 )
 
+DEFAULT_LANGUAGE_CLARIFICATION = (
+    "🌐 We could not process your reply automatically. To continue, please reply with exactly "
+    "one word in English:\n"
+    '• "CONFIRM" to proceed with the delivery.\n'
+    '• "CANCEL" to receive a full refund.'
+)
+
 DEFAULT_CLARIFICATION = (
     "ℹ️ Clarification regarding your order:\n\n"
     "As a reminder, Epic Games strictly restricts linking multiple Twitch accounts to a single Epic "

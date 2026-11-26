@@ -207,3 +207,54 @@ def classify(text: str, languages: list[str] | None = None) -> Reply:
     if len(words) <= 4 and word_set & pack.confirm_words:
         return Reply.confirm
     return Reply.unknown
+
+
+# Keywords in languages the platform does not act on. A buyer who answers with one gets asked to
+# reply in English; nothing is delivered or cancelled because of them. Whole words only: no typo
+# tolerance.
+FOREIGN_KEYWORDS: dict[str, frozenset[str]] = {
+    "French": frozenset(
+        {
+            "confirme",
+            "confirmer",
+            "confirmé",
+            "confirmez",
+            "annuler",
+            "annulez",
+            "annule",
+            "annulé",
+            "annulation",
+            "remboursement",
+            "rembourser",
+        }
+    ),
+    "Italian": frozenset(
+        {
+            "confermo",
+            "conferma",
+            "confermare",
+            "confermato",
+            "annulla",
+            "annullare",
+            "annullo",
+            "annullato",
+            "cancella",
+            "cancellare",
+            "rimborso",
+        }
+    ),
+}
+MAX_FOREIGN_WORDS = 6
+
+
+def foreign_language(text: str) -> str | None:
+    """Name of the language when a short reply holds a French or Italian CONFIRM/CANCEL word."""
+    if not text or "?" in text:
+        return None
+    words = re.sub(r"[^\w\s]", " ", text.lower().replace("\u2019", "'").replace("'", " ")).split()
+    if not words or len(words) > MAX_FOREIGN_WORDS:
+        return None
+    for language, keywords in FOREIGN_KEYWORDS.items():
+        if set(words) & keywords:
+            return language
+    return None

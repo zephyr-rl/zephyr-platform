@@ -43,7 +43,7 @@ from app.core.platform import Platform
 from app.listings.models import DeliveryMode, Listing
 from app.modules.catalog import DeliveriesSettings, TopUpsSettings
 from app.modules.deliveries import messages
-from app.modules.deliveries.replies import Reply, classify
+from app.modules.deliveries.replies import Reply, classify, foreign_language
 from app.orders.models import (
     ACTIVE_STATES,
     Fulfilment,
@@ -806,6 +806,18 @@ async def _check_one(platform: Platform, fulfilment_id: int) -> int:
     return 1 if decision is not None else 0
 
 
+async def _language_clarification_sent(session: AsyncSession, f: Fulfilment) -> bool:
+    found = await session.scalar(
+        select(FulfilmentEvent.id)
+        .where(
+            FulfilmentEvent.fulfilment_id == f.id,
+            FulfilmentEvent.event == "language_clarification_sent",
+        )
+        .limit(1)
+    )
+    return found is not None
+
+
 async def _read_replies(ctx: Context) -> Reply | None:
     f, s, order, cfg = ctx.fulfilment, ctx.session, ctx.order, ctx.settings
     remote = await ctx.remote()
@@ -815,7 +827,13 @@ async def _read_replies(ctx: Context) -> Reply | None:
         return None
     since = f.replies_read_until or f.confirmation_sent_at or f.created_at
     chat = await remote.chat_list_messages(order.conversation_id or "", since)
-    ours = [cfg.confirmation_single, cfg.confirmation_multi, cfg.clarification, cfg.cancellation]
+    ours = [
+        cfg.confirmation_single,
+        cfg.confirmation_multi,
+        cfg.clarification,
+        cfg.language_clarification,
+        cfg.cancellation,
+    ]
     new = [m for m in chat if m.sent_at > since]
     if not new:
         return None
@@ -847,6 +865,46 @@ async def _read_replies(ctx: Context) -> Reply | None:
                 s, "order.cancelled", {"order": order.remote_id, "by": "buyer"}, store_id=f.store_id
             )
             return Reply.cancel
+        language = foreign_language(message.text) if reply is Reply.unknown else None
+        if language is not None:
+            if not await _language_clarification_sent(s, f):
+                await _send(ctx, cfg.language_clarification, kind="language_clarification")
+                note(
+                    s,
+                    f,
+                    "language_clarification_sent",
+                    f"The buyer replied in {language}. Asked them to answer CONFIRM or CANCEL in "
+                    "English; nothing was delivered or cancelled.",
+                    language=language,
+                )
+                events.publish(
+                    s,
+                    "order.delivery_failed",
+                    {
+                        "order": order.remote_id,
+                        "error": (
+                            f'The buyer replied in {language}: "{message.text[:120]}". They were '
+                            "asked to answer CONFIRM or CANCEL in English. Still waiting; nothing "
+                            "was delivered or cancelled."
+                        ),
+                    },
+                    store_id=f.store_id,
+                )
+                return Reply.unknown
+            set_state(f, FulfilmentState.needs_attention)
+            note(
+                s,
+                f,
+                "unclear_reply",
+                f"The buyer replied in {language} again. Please answer in the chat.",
+            )
+            events.publish(
+                s,
+                "order.delivery_failed",
+                {"order": order.remote_id, "error": f"The buyer keeps replying in {language}."},
+                store_id=f.store_id,
+            )
+            return Reply.unknown
         if not f.clarification_sent:
             await _send(ctx, cfg.clarification, kind="clarification")
             f.clarification_sent = True
