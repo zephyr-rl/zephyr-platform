@@ -509,3 +509,8 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
 
 - A listing paused on the marketplace that still has accounts in its vault was paused by the owner (an offer that sold out has an empty vault): restock neither tops it up nor resumes it, and says "Paused with accounts in the vault: left as it is." A paused offer with an empty vault is still restocked and resumed as before.
 - Test added in tests/test_restock.py; 351 pass.
+
+## 2026-11-27 02:40 UTC — Zephyr restock on (owner's request)
+
+- Restock module turned on for Zephyr (interval 1 min, actor `claude:owner-asked-restock-on`, scripts/cutover/restock_on.py).
+- First pass: 12 accounts uploaded to vaults that had sold below target since the old bot stopped (Sky Blue Affluenter PS 3, PC 1; Black Neural Network Xbox 3, PS 5). Every vault now at its target or above; Ranked Ready PlayStation (paused, 1 account) left alone as designed.
