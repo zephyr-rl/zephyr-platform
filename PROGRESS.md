@@ -494,3 +494,7 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
 - New: `vault_remove` in the connectors (Eldorado: DELETE secretDetails/{id}; shadow records `shadow.vault_remove`; fake), `app/modules/restock/trim.py`, `POST /stores/{id}/listing-groups/{gid}/trim {keep, apply}` and a "Pull back extras" window on each cross-platform card (preview, then confirm).
 - Rules: keep at least 1 per platform; vaults read live; accounts the platform took out by hand return as the same row, unknown ones are added from the vault's credentials; accounts in a final state stay in the vault; an account returns to sale only if Eldorado confirmed the removal and a new read no longer lists it; an unconfirmed removal of an account that is gone goes to quarantine; the card's restock lock is held. Audited as `listing_group.vault_trimmed`, item events `pulled_back`.
 - Tests: tests/test_vault_trim.py (6). 350 pass.
+
+## 2026-11-27 — Stock: accounts numbered 1, 2, 3… on screen
+
+- Owner's request: the "#" column shows the row number in the current list (continues across pages); the fixed `position` stays in the database for ordering and history but is no longer shown. "Find a login" no longer shows the position.

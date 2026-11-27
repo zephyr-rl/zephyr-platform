@@ -258,7 +258,6 @@ function FindLogin({
                 >
                   {pool?.name ?? `pool ${result.pool_id}`}
                 </Link>
-                , position {result.position}
               </span>
               {result.note && (
                 <span className="text-muted">· {result.note}</span>
@@ -1468,7 +1467,7 @@ function PoolPanel({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((a) => (
+                {rows.map((a, i) => (
                   <tr key={a.id} className="border-t border-line">
                     <td className="px-3 py-1.5">
                       <input
@@ -1480,7 +1479,7 @@ function PoolPanel({
                       />
                     </td>
                     <td className="tabular px-2 py-1.5 text-muted">
-                      {a.state === "available" ? a.position : "—"}
+                      {page * size + i + 1}
                     </td>
                     <td className="px-2 py-1.5">
                       <CopyCell value={a.login} what="Login" />
