@@ -5,6 +5,22 @@ import { toast } from "sonner";
 import { Button, Modal, TextField } from "@/components/ui";
 import { api, type Listing } from "@/lib/api";
 
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Typed as digits, shown as 24-hour HH:MM ("130" → "1:30" → "01:30" on leaving the field). */
+function typed(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  return digits.length <= 2
+    ? digits
+    : `${digits.slice(0, -2)}:${digits.slice(-2)}`;
+}
+
+function padded(value: string): string {
+  const m = /^(\d{1,2}):?(\d{2})$/.exec(value) ?? /^(\d{1,2})$/.exec(value);
+  if (!m) return value;
+  return `${(m[1] ?? "").padStart(2, "0")}:${m[2] ?? "00"}`;
+}
+
 export function scheduleLabel(listing: Listing): string | null {
   if (!listing.schedule_off || !listing.schedule_on) return null;
   return `Paused ${listing.schedule_off}–${listing.schedule_on}`;
@@ -86,7 +102,9 @@ function ScheduleDialog({
     onError: (e) =>
       toast.error("Could not save the schedule", { description: e.message }),
   });
-  const valid = off !== "" && on !== "" && off !== on;
+  const offOk = HHMM.test(padded(off));
+  const onOk = HHMM.test(padded(on));
+  const valid = offOk && onOk && padded(off) !== padded(on);
   return (
     <Modal
       open
@@ -106,20 +124,33 @@ function ScheduleDialog({
       </p>
       <div className="grid grid-cols-2 gap-3">
         <TextField
-          label="Pause at"
-          type="time"
+          label="Pause at (24 h)"
+          placeholder="HH:MM"
+          inputMode="numeric"
+          maxLength={5}
           value={off}
-          onChange={(e) => setOff(e.target.value)}
+          onChange={(e) => setOff(typed(e.target.value))}
+          onBlur={() => setOff(padded(off))}
         />
         <TextField
-          label="Turn on at"
-          type="time"
+          label="Turn on at (24 h)"
+          placeholder="HH:MM"
+          inputMode="numeric"
+          maxLength={5}
           value={on}
-          onChange={(e) => setOn(e.target.value)}
+          onChange={(e) => setOn(typed(e.target.value))}
+          onBlur={() => setOn(padded(on))}
         />
       </div>
-      {off === on && off !== "" && (
-        <p className="text-[13px] text-danger">The two times must differ.</p>
+      {(off !== "" && !offOk) || (on !== "" && !onOk) ? (
+        <p className="text-[13px] text-danger">
+          Use 24-hour time, from 00:00 to 23:59.
+        </p>
+      ) : (
+        offOk &&
+        padded(off) === padded(on) && (
+          <p className="text-[13px] text-danger">The two times must differ.</p>
+        )
       )}
       {listing.schedule_note && (
         <p className="text-[12px] text-muted">
@@ -146,7 +177,7 @@ function ScheduleDialog({
             variant="primary"
             busy={save.isPending}
             disabled={!valid}
-            onClick={() => save.mutate({ off, on })}
+            onClick={() => save.mutate({ off: padded(off), on: padded(on) })}
           >
             Save
           </Button>

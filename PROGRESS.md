@@ -522,3 +522,7 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
 - Acts only when the wanted state changes, so a pause or resume by hand in between is kept until the next scheduled time. Saving a schedule inside the off window pauses at once; inside the on window nothing happens until the next off time. Closed offers are left alone. Shadow mode only records. Failures raise a "System error" alert; a permanent error is not retried every minute.
 - Eldorado connector: top-up offers can now be paused/resumed (they are item-management offers; the item endpoints are used).
 - Tests: tests/test_offer_schedule.py (6); 357 pass. Checked in the browser.
+
+## 2026-11-27 — Offer schedule: 24-hour times
+
+- Owner's request: the browser's time picker showed AM/PM. The two fields are now plain 24-hour "HH:MM" text (type digits: "2330" → 23:30, "800" → 08:00), validated 00:00–23:59. Checked in the browser.
