@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, status
@@ -11,7 +11,7 @@ from app.api.deps import AuthDep, OwnerDep, PlatformDep, SessionDep
 from app.api.v1.orders import ATTENTION
 from app.core import audit
 from app.core.crypto import CryptoError
-from app.listings import groups, service
+from app.listings import groups, schedule, service
 from app.listings.models import DeliveryMode, Listing
 from app.modules.restock import service as restock
 from app.orders.models import Fulfilment, Order
@@ -54,6 +54,9 @@ class ListingOut(BaseModel):
     device: str | None
     platform: str | None
     orders_need_you: int  # orders of this listing waiting for the owner (top-ups, approvals)
+    schedule_off: str | None  # "HH:MM", store time
+    schedule_on: str | None
+    schedule_note: str | None
 
 
 class ListingPatch(BaseModel):
@@ -69,6 +72,11 @@ class ListingPatch(BaseModel):
     restock_target: int | None = Field(None, ge=1, le=100)
     clear_restock_target: bool = False
     auto_resume: bool | None = None
+
+
+class ScheduleIn(BaseModel):
+    off: time | None = Field(None, description="Pause time, store time zone (HH:MM).")
+    on: time | None = Field(None, description="Turn-on time, store time zone (HH:MM).")
 
 
 class RestockOut(BaseModel):
@@ -156,6 +164,9 @@ async def _out(session: SessionDep, listings: list[Listing]) -> list[ListingOut]
             device=x.device,
             platform=x.platform,
             orders_need_you=need_you.get(x.id, 0),
+            schedule_off=f"{x.schedule_off:%H:%M}" if x.schedule_off else None,
+            schedule_on=f"{x.schedule_on:%H:%M}" if x.schedule_on else None,
+            schedule_note=x.schedule_note,
         )
         for x in listings
     ]
@@ -286,3 +297,25 @@ async def uploads(
         )
         for u in await restock.recent_uploads(session, listing)
     ]
+
+
+@router.put("/{listing_id}/schedule", response_model=ListingOut)
+async def set_schedule(
+    store_id: int, listing_id: int, body: ScheduleIn, auth: OwnerDep, session: SessionDep
+) -> ListingOut:
+    """Pause the offer every day at ``off`` and turn it back on at ``on`` (both null: remove)."""
+    try:
+        listing = await service.get_listing(session, store_id, listing_id)
+        schedule.set_schedule(
+            session,
+            auth.actor,
+            listing,
+            body.off.replace(second=0, microsecond=0) if body.off else None,
+            body.on.replace(second=0, microsecond=0) if body.on else None,
+        )
+    except service.NotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from None
+    except schedule.ScheduleError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+    await session.commit()
+    return (await _out(session, [listing]))[0]

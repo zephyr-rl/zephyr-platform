@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import enum
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 from typing import Any
 
@@ -16,6 +16,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    Time,
     UniqueConstraint,
     func,
 )
@@ -109,6 +110,12 @@ class Listing(TimestampMixin, Base):
     vault_count: Mapped[int | None] = mapped_column(Integer)
     last_restock_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_restock_note: Mapped[str | None] = mapped_column(Text)
+    # Daily schedule (store time): paused at schedule_off, back on at schedule_on.
+    schedule_off: Mapped[time | None] = mapped_column(Time)
+    schedule_on: Mapped[time | None] = mapped_column(Time)
+    schedule_applied: Mapped[str | None] = mapped_column(String(3))  # "off" / "on" last applied
+    schedule_last_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    schedule_note: Mapped[str | None] = mapped_column(Text)
     # Part of a cross-platform card: its vault settings come from the card.
     group_id: Mapped[int | None] = mapped_column(
         ForeignKey("listing_groups.id", ondelete="SET NULL"), index=True

@@ -514,3 +514,11 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
 
 - Restock module turned on for Zephyr (interval 1 min, actor `claude:owner-asked-restock-on`, scripts/cutover/restock_on.py).
 - First pass: 12 accounts uploaded to vaults that had sold below target since the old bot stopped (Sky Blue Affluenter PS 3, PC 1; Black Neural Network Xbox 3, PS 5). Every vault now at its target or above; Ranked Ready PlayStation (paused, 1 account) left alone as designed.
+
+## 2026-11-27 — Offer schedule (pause at night, turn on in the morning)
+
+- Owner's request: offers left open at night by mistake. Each offer in Listings (accounts, custom items, top-ups) has a "Schedule" button: "Pause at" and "Turn on at" (store time zone, the window may cross midnight). The card shows "Schedule: Paused HH:MM–HH:MM every day".
+- `app/listings/schedule.py`, job `listings.schedule` every 60 s for every active store (registered by the always-on Deliveries module), `PUT /stores/{id}/listings/{lid}/schedule {off, on}` (both null removes it). Migration d4f7a2c9e1b5 adds listings.schedule_off/on/applied/last_at/note.
+- Acts only when the wanted state changes, so a pause or resume by hand in between is kept until the next scheduled time. Saving a schedule inside the off window pauses at once; inside the on window nothing happens until the next off time. Closed offers are left alone. Shadow mode only records. Failures raise a "System error" alert; a permanent error is not retried every minute.
+- Eldorado connector: top-up offers can now be paused/resumed (they are item-management offers; the item endpoints are used).
+- Tests: tests/test_offer_schedule.py (6); 357 pass. Checked in the browser.

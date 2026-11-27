@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Badge, Button, Switch } from "@/components/ui";
 import { api, type Listing, type StockPool, type StoreModule } from "@/lib/api";
+import { ScheduleButton, ScheduleLine } from "@/components/listings/Schedule";
 
 const MODE_LABEL: Record<Listing["delivery_mode"], string> = {
   manual: "Manual",
@@ -46,10 +47,12 @@ function firstLine(text: string | null | undefined): string {
 }
 
 function Shell({
+  storeId,
   listing,
   children,
   onEdit,
 }: {
+  storeId: number;
   listing: Listing;
   children: React.ReactNode;
   onEdit: () => void;
@@ -70,6 +73,7 @@ function Shell({
         <StateBadge listing={listing} />
       </div>
       {children}
+      <ScheduleLine listing={listing} />
       <div className="mt-auto flex justify-end gap-2 border-t border-line pt-2">
         {url && (
           <a
@@ -81,6 +85,7 @@ function Shell({
             Eldorado ↗
           </a>
         )}
+        <ScheduleButton storeId={storeId} listing={listing} />
         <Button size="sm" onClick={onEdit}>
           Edit
         </Button>
@@ -125,7 +130,7 @@ export function ItemCard({
     onEdit();
   };
   return (
-    <Shell listing={listing} onEdit={onEdit}>
+    <Shell storeId={storeId} listing={listing} onEdit={onEdit}>
       <div className="text-muted">
         {money(listing.price, listing.currency)}
         {listing.remote_quantity !== null &&
@@ -236,7 +241,7 @@ export function TopupCard({
       toast.error("Could not change the top-up", { description: e.message }),
   });
   return (
-    <Shell listing={listing} onEdit={onEdit}>
+    <Shell storeId={storeId} listing={listing} onEdit={onEdit}>
       <div className="text-muted">
         {money(listing.price, listing.currency)}
         {listing.platform && ` · ${listing.platform}`}

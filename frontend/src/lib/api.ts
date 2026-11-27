@@ -311,6 +311,9 @@ export interface Listing {
   device: "pc" | "playstation" | "xbox" | null;
   platform: string | null;
   orders_need_you: number;
+  schedule_off: string | null;
+  schedule_on: string | null;
+  schedule_note: string | null;
 }
 
 export interface CardDevice {

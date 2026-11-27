@@ -25,6 +25,7 @@ import {
 } from "@/lib/api";
 import { CrossPlatformCards } from "@/components/listings/CrossPlatformCards";
 import { ItemCard, TopupCard } from "@/components/listings/OfferCards";
+import { ScheduleButton } from "@/components/listings/Schedule";
 import {
   DeliveriesSwitch,
   RestockSwitch,
@@ -994,6 +995,7 @@ export function ListingsPage() {
                                 }
                               />
                             )}
+                          <ScheduleButton storeId={storeId} listing={l} />
                           {l.group_id !== null ? (
                             <Button
                               size="sm"

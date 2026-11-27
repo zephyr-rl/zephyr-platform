@@ -253,12 +253,11 @@ class EldoradoConnector:
         action = "pause" if state is OfferState.paused else "resume"
         if kind is OfferKind.account:
             await self._http.request("PUT", f"api/flexibleOffersUser/me/{remote_id}/{action}")
-        elif kind is OfferKind.item:
+        else:
+            # Top-ups are item-management offers on Eldorado (told apart by their category).
             await self._http.request(
                 "POST", f"api/v1/item-management/me/offers/{remote_id}/{action}"
             )
-        else:
-            raise ConnectorError("Pausing a top-up offer is not supported.", retryable=False)
         return RemoteResult(ok=True, remote_state=state.value)
 
     # ---- vault (instant delivery) ----------------------------------------------------

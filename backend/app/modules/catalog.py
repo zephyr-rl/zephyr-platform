@@ -225,6 +225,14 @@ class DeliveriesModule(DeclaredModule):
         from app.modules.deliveries import jobs as delivery_jobs
 
         delivery_jobs.register(ctx)
+        # Offer schedules (Listings page) belong to no module: registered here because this
+        # module is always on; module_key None runs it for every active store.
+        from app.listings import schedule_jobs
+
+        schedule_jobs.register(ctx)
+        ctx.periodic.append(
+            PeriodicTask("offer-schedule", "listings.schedule", timedelta(seconds=60))
+        )
         ctx.periodic.append(
             PeriodicTask("orders-poll", "orders.poll", timedelta(seconds=60), module_key=self.key)
         )
