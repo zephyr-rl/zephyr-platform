@@ -61,7 +61,7 @@ function range(
 }
 
 const dayLabel = (day: string, opts: Intl.DateTimeFormatOptions) =>
-  new Intl.DateTimeFormat(undefined, { ...opts, timeZone: "UTC" }).format(
+  new Intl.DateTimeFormat(undefined, { hourCycle: "h23", ...opts, timeZone: "UTC" }).format(
     new Date(`${day}T12:00:00Z`),
   );
 

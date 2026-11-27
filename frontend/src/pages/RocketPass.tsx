@@ -65,7 +65,7 @@ const BASE = "/tools/rocket-pass";
 // The Epic login that returns the authorization code (Epic Games Launcher client).
 const EPIC_LOGIN_URL =
   "https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D34a02cf8f4414e29b15921876da36f9a%26responseType%3Dcode";
-const dateTime = new Intl.DateTimeFormat(undefined, {
+const dateTime = new Intl.DateTimeFormat(undefined, { hourCycle: "h23",
   dateStyle: "medium",
   timeStyle: "short",
 });
@@ -221,7 +221,7 @@ function PassReport({
   );
 }
 
-const timeOnly = new Intl.DateTimeFormat(undefined, {
+const timeOnly = new Intl.DateTimeFormat(undefined, { hourCycle: "h23",
   hour: "2-digit",
   minute: "2-digit",
   second: "2-digit",

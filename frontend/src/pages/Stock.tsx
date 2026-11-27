@@ -51,7 +51,7 @@ import {
   STATE_TONE,
 } from "@/lib/stock";
 
-const dateTime = new Intl.DateTimeFormat(undefined, {
+const dateTime = new Intl.DateTimeFormat(undefined, { hourCycle: "h23",
   dateStyle: "medium",
   timeStyle: "short",
 });

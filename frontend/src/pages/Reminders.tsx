@@ -6,7 +6,7 @@ import { Badge, Button, Card, ConfirmDialog, EmptyState } from "@/components/ui"
 import { api, type ReminderCandidate, type ReminderRow, type RemindersStatus } from "@/lib/api";
 import { useStores } from "@/lib/session";
 
-const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+const dateTime = new Intl.DateTimeFormat(undefined, { hourCycle: "h23", dateStyle: "medium", timeStyle: "short" });
 
 const STATE: Record<ReminderRow["state"], { label: string; tone: "success" | "progress" | "danger" | "neutral" }> = {
   queued: { label: "Queued", tone: "progress" },

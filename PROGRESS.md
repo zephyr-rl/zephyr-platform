@@ -526,3 +526,7 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
 ## 2026-11-27 — Offer schedule: 24-hour times
 
 - Owner's request: the browser's time picker showed AM/PM. The two fields are now plain 24-hour "HH:MM" text (type digits: "2330" → 23:30, "800" → 08:00), validated 00:00–23:59. Checked in the browser.
+
+## 2026-11-27 — Whole panel in 24-hour time
+
+- Owner's request: every date/time formatter in the panel (Orders, Overview, Listings, Stock, Messages, Notifications, Reminders, Reports, Settings, Rocket Pass) now uses `hourCycle: "h23"` ("Nov 27, 2026, 13:14"). Backend texts already used %H:%M.

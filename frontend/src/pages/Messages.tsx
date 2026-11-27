@@ -12,7 +12,7 @@ import {
 import { api, type ChatThread } from "@/lib/api";
 import { useStores } from "@/lib/session";
 
-const dateTime = new Intl.DateTimeFormat(undefined, {
+const dateTime = new Intl.DateTimeFormat(undefined, { hourCycle: "h23",
   dateStyle: "medium",
   timeStyle: "short",
 });

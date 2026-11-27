@@ -14,7 +14,7 @@ import {
 import { useStores } from "@/lib/session";
 import { browserTimeZone, TimeZoneSelect } from "@/components/TimeZoneSelect";
 
-const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+const dateTime = new Intl.DateTimeFormat(undefined, { hourCycle: "h23", dateStyle: "medium", timeStyle: "short" });
 const fmt = (iso: string) => dateTime.format(new Date(iso));
 
 // ---- stores ------------------------------------------------------------------------------

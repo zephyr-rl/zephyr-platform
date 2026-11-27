@@ -8,7 +8,7 @@ import { useStores } from "@/lib/session";
 import { plural } from "@/lib/stock";
 
 type Tone = "success" | "progress" | "warning" | "danger" | "neutral";
-const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+const dateTime = new Intl.DateTimeFormat(undefined, { hourCycle: "h23", dateStyle: "medium", timeStyle: "short" });
 
 export const FULFILMENT: Record<FulfilmentState, { label: string; tone: Tone }> = {
   pending: { label: "Starting", tone: "progress" },

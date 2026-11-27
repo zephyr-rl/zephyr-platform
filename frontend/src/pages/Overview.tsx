@@ -46,7 +46,7 @@ function actionLabel(action: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-const timeOnly = new Intl.DateTimeFormat(undefined, {
+const timeOnly = new Intl.DateTimeFormat(undefined, { hourCycle: "h23",
   dateStyle: "short",
   timeStyle: "short",
 });
