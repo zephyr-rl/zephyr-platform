@@ -303,6 +303,12 @@ class EldoradoConnector:
         remote_id = parse.first(body, "id") if isinstance(body, dict) else None
         return RemoteResult(ok=True, remote_state=str(remote_id) if remote_id else None)
 
+    async def vault_remove(self, offer_id: str, entry_id: str) -> RemoteResult:
+        await self._http.request(
+            "DELETE", f"api/flexibleOffersUser/me/offers/{offer_id}/secretDetails/{entry_id}"
+        )
+        return RemoteResult(ok=True)
+
     # ---- chat --------------------------------------------------------------------------
 
     async def _chat_user(self) -> str:

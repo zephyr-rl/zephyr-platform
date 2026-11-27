@@ -150,6 +150,15 @@ class FakeConnector:
         self.market.vault[offer_id].append(stored)
         return RemoteResult(ok=True, remote_state=stored.remote_id)
 
+    async def vault_remove(self, offer_id: str, entry_id: str) -> RemoteResult:
+        self._enter("vault_remove", offer_id, entry_id)
+        entries = self.market.vault[offer_id]
+        for i, e in enumerate(entries):
+            if e.remote_id == entry_id:
+                del entries[i]
+                return RemoteResult(ok=True)
+        raise ConnectorError(f"Vault entry {entry_id} not found", retryable=False, status=404)
+
     async def chat_list_messages(self, conversation_id: str, since: datetime) -> list[ChatMessage]:
         self._enter("chat_list_messages", conversation_id, since)
         return [m for m in self.market.messages[conversation_id] if m.sent_at >= since]

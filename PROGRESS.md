@@ -487,3 +487,10 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
 - Checked after: orders.poll, deliveries.check_replies, chat_monitor.scan and reports.daily run without errors and no shadow.* decision is recorded for Zephyr. Kawai and Jewelry stay in shadow.
 - Known gap for the next cut-overs: a paid order that already has a shadow (simulated) fulfilment is not taken over when shadow ends. Check for those right after turning shadow off (shadow_off.py lists them).
 - To do: rotate Zephyr's Eldorado credentials (the old bot's copy still holds them).
+
+## 2026-11-27 — Pull back extras (vault trim)
+
+- Cause of the over-stocked vaults (old system, restock_manager.py `restock_cross_platform_group`): when reading a vault failed (rate limit "Quota exceeded", Cloudflare 1015) the count stayed 0, so the whole target was uploaded again on top of what was there; it also ignored paused offers and resumed them. Logs (from 11/18): Ranked Ready PlayStation got batches of exactly 5 (5+5+10); 113 / 69 DROPS logged 60 and 22 "out of stock" warnings while their vaults held 4–15 each. The platform already refuses to read a failed vault as empty.
+- New: `vault_remove` in the connectors (Eldorado: DELETE secretDetails/{id}; shadow records `shadow.vault_remove`; fake), `app/modules/restock/trim.py`, `POST /stores/{id}/listing-groups/{gid}/trim {keep, apply}` and a "Pull back extras" window on each cross-platform card (preview, then confirm).
+- Rules: keep at least 1 per platform; vaults read live; accounts the platform took out by hand return as the same row, unknown ones are added from the vault's credentials; accounts in a final state stay in the vault; an account returns to sale only if Eldorado confirmed the removal and a new read no longer lists it; an unconfirmed removal of an account that is gone goes to quarantine; the card's restock lock is held. Audited as `listing_group.vault_trimmed`, item events `pulled_back`.
+- Tests: tests/test_vault_trim.py (6). 350 pass.

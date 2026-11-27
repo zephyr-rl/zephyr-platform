@@ -45,6 +45,169 @@ function stateBadge(d: ListingCard["devices"][number]) {
   );
 }
 
+type TrimPlatform = {
+  device: string;
+  label: string;
+  offer_state: string;
+  in_vault: number;
+  keep: number;
+  remove: string[];
+  known: number;
+  removed: number;
+  returned: number;
+  quarantined: number;
+  errors: string[];
+};
+type TrimResult = {
+  pool: string;
+  done: boolean;
+  to_remove: number;
+  platforms: TrimPlatform[];
+};
+
+/** Pull back extras: vaults down to a number per platform, the rest back to the pool. */
+function PullBack({
+  card,
+  storeId,
+  onClose,
+  onDone,
+}: {
+  card: ListingCard;
+  storeId: number;
+  onClose: () => void;
+  onDone: () => Promise<void>;
+}) {
+  const devices = card.devices.filter((d) => d.listing_id);
+  const [keep, setKeep] = useState<Record<string, string>>(
+    Object.fromEntries(
+      devices.map((d) => [d.device, String(card.effective_target)]),
+    ),
+  );
+  const [plan, setPlan] = useState<TrimResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const url = `/stores/${storeId}/listing-groups/${card.id}/trim`;
+  const body = (apply: boolean) => ({
+    keep: Object.fromEntries(
+      Object.entries(keep).map(([k, v]) => [k, Number(v)]),
+    ),
+    apply,
+  });
+  const valid = Object.values(keep).every(
+    (v) => /^\d+$/.test(v) && Number(v) >= 1,
+  );
+  const run = async (apply: boolean) => {
+    setBusy(true);
+    try {
+      const r = await api<TrimResult>(url, {
+        method: "POST",
+        body: body(apply),
+      });
+      setPlan(r);
+      if (apply) {
+        await onDone();
+        const back = r.platforms.reduce((n, p) => n + p.returned, 0);
+        const held = r.platforms.reduce((n, p) => n + p.quarantined, 0);
+        toast.success(`${back} accounts back in ${r.pool}`, {
+          description: held
+            ? `${held} quarantined: Eldorado did not confirm the removal, check they were not sold.`
+            : undefined,
+        });
+      }
+    } catch (error) {
+      toast.error(apply ? "Pull back failed" : "Could not read the vaults", {
+        description: (error as Error).message,
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title="Pull back extras"
+      description={`Accounts above the number you keep are taken out of each vault and return to ${card.pool_name ?? "the pool"} as available. Keep at least 1: Eldorado does not allow an empty instant-delivery offer.`}
+      wide
+    >
+      <div className="grid grid-cols-3 gap-3">
+        {devices.map((d) => (
+          <TextField
+            key={d.device}
+            label={`Keep on ${d.label}`}
+            inputMode="numeric"
+            value={keep[d.device] ?? ""}
+            onChange={(e) => {
+              setPlan(null);
+              setKeep({ ...keep, [d.device]: e.target.value.trim() });
+            }}
+          />
+        ))}
+      </div>
+      {plan && (
+        <table className="w-full border-collapse text-[13px]">
+          <thead>
+            <tr className="text-left text-muted">
+              <th className="py-1.5 font-normal">Platform</th>
+              <th className="py-1.5 text-right font-normal">In vault</th>
+              <th className="py-1.5 text-right font-normal">Keep</th>
+              <th className="py-1.5 text-right font-normal">
+                {plan.done ? "Back in pool" : "To pull back"}
+              </th>
+              <th className="py-1.5 pl-4 font-normal">Accounts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {plan.platforms.map((p) => (
+              <tr key={p.device} className="border-t border-line align-top">
+                <td className="py-2 font-medium">
+                  {p.label}
+                  {p.offer_state !== "active" && (
+                    <span className="ml-2 text-warning">{p.offer_state}</span>
+                  )}
+                </td>
+                <td className="tabular py-2 text-right">{p.in_vault}</td>
+                <td className="tabular py-2 text-right">{p.keep}</td>
+                <td className="tabular py-2 text-right">
+                  {plan.done ? p.returned : p.remove.length}
+                </td>
+                <td className="py-2 pl-4 text-muted">
+                  {p.remove.join(", ") || "—"}
+                  {p.errors.map((e) => (
+                    <div key={e} className="text-danger">
+                      {e}
+                    </div>
+                  ))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <div className="flex justify-end gap-2">
+        <Button onClick={onClose}>{plan?.done ? "Close" : "Cancel"}</Button>
+        {!plan?.done && (
+          <Button onClick={() => run(false)} disabled={!valid || busy}>
+            {busy && !plan ? "Reading vaults…" : "Preview"}
+          </Button>
+        )}
+        {plan && !plan.done && plan.to_remove > 0 && (
+          <ConfirmDialog
+            trigger={
+              <Button variant="primary" disabled={busy}>
+                Pull back {plan.to_remove}
+              </Button>
+            }
+            title={`Pull back ${plan.to_remove} accounts?`}
+            description={`They are removed from the Eldorado vaults and return to ${plan.pool}. The vaults are read again first, so recent sales are taken into account.`}
+            confirmLabel="Pull back"
+            onConfirm={() => run(true)}
+          />
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 function CardView({
   card,
   storeId,
@@ -82,6 +245,7 @@ function CardView({
       toast.error("Could not change the card", { description: e.message }),
   });
   const empty = card.pool_available === 0;
+  const [pulling, setPulling] = useState(false);
   return (
     <section
       className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4"
@@ -190,10 +354,27 @@ function CardView({
             }}
           />
         )}
+        {card.pool_id && card.devices.some((d) => d.listing_id) && (
+          <Button
+            size="sm"
+            onClick={() => setPulling(true)}
+            title="Take accounts above a number out of the vaults, back into the pool"
+          >
+            Pull back extras
+          </Button>
+        )}
         <Button size="sm" onClick={onEdit}>
           Edit
         </Button>
       </div>
+      {pulling && (
+        <PullBack
+          card={card}
+          storeId={storeId}
+          onClose={() => setPulling(false)}
+          onDone={refresh}
+        />
+      )}
     </section>
   );
 }
@@ -492,9 +673,7 @@ export function CrossPlatformCards({
   const list = all.filter((c) =>
     words.every((w) => c.title.toLowerCase().includes(w)),
   );
-  const fromRow = editCardId
-    ? all.find((c) => c.id === editCardId)
-    : undefined;
+  const fromRow = editCardId ? all.find((c) => c.id === editCardId) : undefined;
   const open = fromRow ?? editing;
   const close = () => {
     setEditing(null);

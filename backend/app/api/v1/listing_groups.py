@@ -10,12 +10,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from app.api.deps import AuthDep, OwnerDep, PlatformDep, SessionDep
+from app.connectors.base import ConnectorError
 from app.core import audit
 from app.core.crypto import CryptoError
 from app.listings import groups, service
 from app.listings.models import DEVICES, Listing, ListingGroup
 from app.modules.catalog import RestockSettings
 from app.modules.restock import service as restock
+from app.modules.restock import trim
 from app.stock.models import ItemState, StockItem, StockPool
 from app.stores.models import StoreModule
 
@@ -273,3 +275,64 @@ async def restock_group(
             )
         )
     return GroupRestockOut(results=results, shadow=shadow)
+
+
+class TrimIn(BaseModel):
+    keep: dict[str, int] = Field(
+        ..., description="Platform → accounts to keep in its vault (at least 1)."
+    )
+    apply: bool = Field(False, description="False only shows what would be pulled back.")
+
+
+class TrimPlatformOut(BaseModel):
+    device: str
+    label: str
+    offer_state: str
+    in_vault: int
+    keep: int
+    remove: list[str]
+    known: int
+    removed: int
+    returned: int
+    quarantined: int
+    errors: list[str]
+
+
+class TrimOut(BaseModel):
+    pool: str
+    done: bool
+    to_remove: int
+    platforms: list[TrimPlatformOut]
+
+
+@router.post("/{group_id}/trim", response_model=TrimOut)
+async def trim_group(
+    store_id: int,
+    group_id: int,
+    body: TrimIn,
+    auth: OwnerDep,
+    platform: PlatformDep,
+    session: SessionDep,
+) -> TrimOut:
+    """Pull back extras: take accounts out of the vaults down to ``keep`` and return them to the
+    card's pool. With ``apply`` false nothing changes (the plan is read from the live vaults)."""
+    try:
+        group = await groups.get_group(session, store_id, group_id)
+        result = await trim.trim(session, platform, auth.actor, group, body.keep, apply=body.apply)
+    except service.ListingError as exc:
+        raise _error(exc) from None
+    except trim.TrimError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+    except ConnectorError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Eldorado: {exc}") from None
+    except CryptoError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from None
+    return TrimOut(
+        pool=result.pool,
+        done=result.done,
+        to_remove=result.to_remove,
+        platforms=[
+            TrimPlatformOut(label=DEVICES.get(p.device, p.device), **vars(p))
+            for p in result.platforms
+        ],
+    )

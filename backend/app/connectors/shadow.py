@@ -91,6 +91,9 @@ class ShadowConnector:
     async def vault_add(self, offer_id: str, entry: VaultEntry) -> RemoteResult:
         return await self._would("vault_add", offer_id)
 
+    async def vault_remove(self, offer_id: str, entry_id: str) -> RemoteResult:
+        return await self._would("vault_remove", offer_id, entry=entry_id)
+
     async def chat_send(self, conversation_id: str, text: str) -> RemoteResult:
         return await self._would("chat_send", conversation_id, length=len(text))
 
