@@ -498,3 +498,9 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
 ## 2026-11-27 — Stock: accounts numbered 1, 2, 3… on screen
 
 - Owner's request: the "#" column shows the row number in the current list (continues across pages); the fixed `position` stays in the database for ordering and history but is no longer shown. "Find a login" no longer shows the position.
+
+## 2026-11-27 02:40 UTC — Zephyr: extras pulled back (owner's OK)
+
+- Kept: Ranked Ready PC 5 / PlayStation 1 / Xbox 5; 69 DROPS and 113 DROPS 2 per platform (scripts/cutover/trim_run.py, actor `claude:owner-asked-trim`).
+- 75 accounts removed from the Eldorado vaults and returned as available: Ranked Ready +45 (14 → 59), RLCS x49 +8 (0 → 8), RLCS x93 +22 (0 → 22). 0 quarantined, 0 errors. A fresh read confirms every vault at the kept number.
+- The Eldorado DELETE secretDetails/{id} endpoint works (first use; the old system never called it).
