@@ -504,3 +504,8 @@ a test message on a Discord test channel (acceptance criterion of Stage 7).
 - Kept: Ranked Ready PC 5 / PlayStation 1 / Xbox 5; 69 DROPS and 113 DROPS 2 per platform (scripts/cutover/trim_run.py, actor `claude:owner-asked-trim`).
 - 75 accounts removed from the Eldorado vaults and returned as available: Ranked Ready +45 (14 → 59), RLCS x49 +8 (0 → 8), RLCS x93 +22 (0 → 22). 0 quarantined, 0 errors. A fresh read confirms every vault at the kept number.
 - The Eldorado DELETE secretDetails/{id} endpoint works (first use; the old system never called it).
+
+## 2026-11-27 — Restock leaves paused offers alone
+
+- A listing paused on the marketplace that still has accounts in its vault was paused by the owner (an offer that sold out has an empty vault): restock neither tops it up nor resumes it, and says "Paused with accounts in the vault: left as it is." A paused offer with an empty vault is still restocked and resumed as before.
+- Test added in tests/test_restock.py; 351 pass.

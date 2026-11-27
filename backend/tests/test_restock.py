@@ -303,6 +303,19 @@ async def test_paused_offer_with_a_full_vault_stays_paused(
     assert not result.resumed and vault.market.offers[OFFER].state is OfferState.paused
 
 
+async def test_paused_offer_with_accounts_below_target_is_left_alone(
+    session: AsyncSession, vault: Vault
+) -> None:
+    """Paused by the owner (it still has accounts): neither topped up nor resumed."""
+    await vault.setup(session, remote_state="paused", target=5)
+    vault.market.vault[OFFER].append(VaultEntry(login="someone", password="x"))
+    result = await vault.run()
+    assert result.uploaded == 0 and not result.resumed
+    assert vault.market.offers[OFFER].state is OfferState.paused
+    assert len(vault.market.vault[OFFER]) == 1
+    assert "left as it is" in result.summary
+
+
 async def test_shadow_mode_records_and_touches_no_stock(
     session: AsyncSession, vault: Vault
 ) -> None:

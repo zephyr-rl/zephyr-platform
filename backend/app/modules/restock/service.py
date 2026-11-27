@@ -233,6 +233,11 @@ async def _run(
         await session.commit()
 
     needed = max(0, result.target - len(in_vault))
+    if needed and in_vault and listing.remote_state == OfferState.paused.value:
+        # Paused with accounts still in the vault: the owner paused it (an offer that sold out
+        # has an empty vault). Neither topped up nor resumed.
+        result.notes.append("Paused with accounts in the vault: left as it is.")
+        needed = 0
     if needed and result.shadow:
         await _shadow_uploads(session, platform, connector, listing, in_vault, needed, result)
     elif needed:
